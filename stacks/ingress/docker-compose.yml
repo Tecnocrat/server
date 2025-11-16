@@ -1,0 +1,64 @@
+version: '3.8'
+
+# AIOS Supercell - Traefik Ingress Stack
+# Provides TLS termination, hostname-based routing, and automatic service discovery
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: aios-traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - aios-ingress
+    ports:
+      - "80:80"       # HTTP
+      - "443:443"     # HTTPS
+      - "8080:8080"   # Dashboard (restrict in production)
+    environment:
+      - TZ=America/New_York
+    volumes:
+      # Traefik configuration
+      - ./traefik.yml:/traefik.yml:ro
+      - ./dynamic:/dynamic:ro
+      
+      # TLS certificates
+      - ./certs:/certs
+      
+      # Let's Encrypt ACME storage (if using Let's Encrypt)
+      - ./acme.json:/acme.json
+      
+      # Docker socket for service discovery
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.enable=true"
+      
+      # Dashboard
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.lan`)"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.entrypoints=websecure"
+      - "traefik.http.routers.dashboard.tls=true"
+      
+      # Middleware for dashboard auth (change credentials!)
+      - "traefik.http.middlewares.auth.basicauth.users=admin:$$apr1$$8EVjn/nj$$GiLUZqcbueTFeD23SuB6x0" # admin:changeme
+      - "traefik.http.routers.dashboard.middlewares=auth"
+
+  # Whoami test service to verify routing
+  whoami:
+    image: traefik/whoami:latest
+    container_name: aios-whoami
+    restart: unless-stopped
+    networks:
+      - aios-ingress
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.lan`)"
+      - "traefik.http.routers.whoami.entrypoints=websecure"
+      - "traefik.http.routers.whoami.tls=true"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+
+networks:
+  aios-ingress:
+    name: aios-ingress
+    driver: bridge

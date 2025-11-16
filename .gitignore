@@ -1,0 +1,17 @@
+﻿# Docker volumes and data
+**/data/
+**/volumes/
+
+# Secrets and sensitive files
+**/certs/*.key
+**/acme.json
+vault-unseal-keys.json
+vault-root-token.txt
+
+# Logs
+**/logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

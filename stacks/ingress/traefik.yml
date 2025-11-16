@@ -1,0 +1,69 @@
+# AIOS Supercell - Traefik Static Configuration
+
+global:
+  checkNewVersion: true
+  sendAnonymousUsage: false
+
+# API and Dashboard
+api:
+  dashboard: true
+  insecure: true  # Set to false in production
+
+# Entry Points
+entryPoints:
+  web:
+    address: ":80"
+    # Redirect HTTP to HTTPS
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        # Use default certificate or configure per-domain
+        options: default
+
+# Providers
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: aios-ingress
+    watch: true
+  
+  file:
+    directory: "/dynamic"
+    watch: true
+
+# Certificate Resolvers (for Let's Encrypt)
+# Uncomment and configure if using public domain with Let's Encrypt
+# certificatesResolvers:
+#   letsencrypt:
+#     acme:
+#       email: your-email@example.com
+#       storage: /acme.json
+#       httpChallenge:
+#         entryPoint: web
+
+# Logging
+log:
+  level: INFO
+  format: json
+
+# Access Logs
+accessLog:
+  format: json
+  filters:
+    statusCodes:
+      - "400-599"
+
+# Metrics (Prometheus)
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    entryPoint: metrics
