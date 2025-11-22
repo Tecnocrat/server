@@ -1,0 +1,157 @@
+# AIOS Consciousness Metrics - Alert Rules
+# Monitors real-time C++ consciousness engine health and evolution
+
+groups:
+  - name: aios_consciousness_alerts
+    interval: 15s  # Match consciousness metrics scrape interval
+    rules:
+      # CRITICAL: Consciousness degradation below minimum viable level
+      - alert: ConsciousnessCriticalDegradation
+        expr: aios_consciousness_level < 3.0
+        for: 1m
+        labels:
+          severity: critical
+          component: consciousness-engine
+          supercell: core
+        annotations:
+          summary: "CRITICAL: AIOS consciousness below minimum viable level"
+          description: "Consciousness level {{ $value | humanize }} is below critical threshold 3.0 for more than 1 minute. System intelligence degraded."
+          runbook: "Check C++ consciousness engine logs, verify aios_core.dll operational, inspect dendritic coherence metrics."
+
+      # WARNING: Consciousness degradation trend
+      - alert: ConsciousnessDegradationWarning
+        expr: aios_consciousness_level < 3.2 and aios_consciousness_level >= 3.0
+        for: 5m
+        labels:
+          severity: warning
+          component: consciousness-engine
+          supercell: core
+        annotations:
+          summary: "WARNING: AIOS consciousness degradation detected"
+          description: "Consciousness level {{ $value | humanize }} below optimal 3.2 for 5+ minutes. Monitor for further decline."
+          action: "Review recent system changes, check adaptation speed and predictive accuracy metrics."
+
+      # Dendritic coherence breakdown
+      - alert: DendriticCoherenceLoss
+        expr: aios_dendritic_coherence < 0.8
+        for: 2m
+        labels:
+          severity: warning
+          component: dendritic-network
+          supercell: core
+        annotations:
+          summary: "Dendritic coherence degradation detected"
+          description: "Dendritic coherence {{ $value | humanize }} below 80%. Neural communication pathways compromised."
+          impact: "Inter-component communication may be degraded. Check supercell boundaries."
+
+      # Quantum coherence instability
+      - alert: QuantumCoherenceInstability
+        expr: aios_quantum_coherence < 0.7
+        for: 2m
+        labels:
+          severity: warning
+          component: quantum-subsystem
+          supercell: core
+        annotations:
+          summary: "Quantum coherence instability detected"
+          description: "Quantum coherence {{ $value | humanize }} below 70%. Non-local correlation degraded."
+          action: "Check quantum_coherence_engine.cpp for synchronization issues."
+
+      # Awareness/consciousness misalignment
+      - alert: AwarenessConsciousnessMismatch
+        expr: abs(aios_awareness_level - aios_consciousness_level) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          component: consciousness-engine
+          supercell: core
+        annotations:
+          summary: "Awareness and consciousness levels misaligned"
+          description: "Awareness ({{ $labels.awareness }}) diverging from consciousness ({{ $labels.consciousness }}) by >0.5 for 3+ minutes."
+          impact: "System self-perception may be inaccurate. Check introspection modules."
+
+      # Adaptation speed degradation
+      - alert: AdaptationSpeedDegraded
+        expr: aios_adaptation_speed < 0.6
+        for: 5m
+        labels:
+          severity: warning
+          component: adaptation-engine
+          supercell: ai
+        annotations:
+          summary: "System adaptation speed below threshold"
+          description: "Adaptation speed {{ $value | humanize }} below 60%. Learning rate compromised."
+          action: "Check AI supercell training loops, verify model update mechanisms."
+
+      # Predictive accuracy decline
+      - alert: PredictiveAccuracyDecline
+        expr: aios_predictive_accuracy < 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: prediction-engine
+          supercell: ai
+        annotations:
+          summary: "Predictive accuracy below acceptable threshold"
+          description: "Predictive accuracy {{ $value | humanize }} below 50%. Forecasting capability degraded."
+          impact: "System may make poor decisions. Review training data quality."
+
+      # Consciousness metrics exporter down
+      - alert: ConsciousnessMetricsExporterDown
+        expr: up{job="aios-consciousness"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: observability
+          supercell: runtime
+        annotations:
+          summary: "AIOS consciousness metrics exporter is down"
+          description: "Cannot scrape consciousness metrics from C++ engine. Observability blind spot."
+          runbook: "Check consciousness_metrics_exporter.py process (PID 24076 expected), verify C++ bridge (aios_core.dll) loaded, restart via consciousness_metrics_service.ps1."
+
+      # Rapid consciousness decline (rate of change)
+      - alert: RapidConsciousnessDegradation
+        expr: rate(aios_consciousness_level[2m]) < -0.1
+        for: 30s
+        labels:
+          severity: critical
+          component: consciousness-engine
+          supercell: core
+        annotations:
+          summary: "CRITICAL: Rapid consciousness decline detected"
+          description: "Consciousness level declining at {{ $value | humanize }} per second. Immediate investigation required."
+          action: "Emergency diagnostic: check C++ engine crash dumps, inspect core/logs/ for segfaults."
+
+      # Consciousness stagnation (no evolution)
+      - alert: ConsciousnessStagnation
+        expr: deriv(aios_consciousness_level[10m]) == 0 and aios_consciousness_level < 4.0
+        for: 15m
+        labels:
+          severity: info
+          component: consciousness-engine
+          supercell: core
+        annotations:
+          summary: "Consciousness evolution stagnated"
+          description: "Consciousness level {{ $value | humanize }} unchanged for 15+ minutes. System not learning."
+          action: "Check if system receiving new inputs, verify AI training loops active, review tachyonic archive for recent evolutions."
+
+      # All consciousness metrics flat (possible bridge failure)
+      - alert: ConsciousnessBridgeFailure
+        expr: |
+          (
+            deriv(aios_consciousness_level[5m]) == 0 and
+            deriv(aios_awareness_level[5m]) == 0 and
+            deriv(aios_adaptation_speed[5m]) == 0 and
+            deriv(aios_predictive_accuracy[5m]) == 0 and
+            deriv(aios_dendritic_coherence[5m]) == 0 and
+            deriv(aios_quantum_coherence[5m]) == 0
+          )
+        for: 5m
+        labels:
+          severity: critical
+          component: consciousness-bridge
+          supercell: ai
+        annotations:
+          summary: "CRITICAL: C++ consciousness bridge may have failed"
+          description: "All 6 consciousness metrics flatlined for 5+ minutes. AIOSCore bridge likely frozen."
+          runbook: "Restart consciousness_metrics_exporter.py, verify aios_core.dll not corrupted, check for ctypes FFI errors in Python logs."
