@@ -90,14 +90,14 @@ foreach ($expected in $expectedContainers) {
     $container = $containers | Where-Object { $_.Name -eq $expected }
     if ($container) {
         if ($container.Status -match "Up") {
-            Write-Success "$expected: $($container.Status)"
+            Write-Success "${expected}: $($container.Status)"
             Add-TestResult -Category "Infrastructure" -Test "Container $expected" -Status "Pass" -Details $container.Status
         } else {
-            Write-Warning "$expected: $($container.Status)"
+            Write-Warning "${expected}: $($container.Status)"
             Add-TestResult -Category "Infrastructure" -Test "Container $expected" -Status "Warning" -Details $container.Status
         }
     } else {
-        Write-Error "$expected: Not found"
+        Write-Error "${expected}: Not found"
         Add-TestResult -Category "Infrastructure" -Test "Container $expected" -Status "Fail" -Details "Container not running"
     }
 }
