@@ -1,0 +1,182 @@
+version: '3.8'
+
+# AIOS Supercell - Cell Communication Stack
+# Containerized Father and Alpha communication servers
+# Provides stable, always-online inter-cell communication
+
+services:
+  # Father AIOS System - Primary communication server
+  father-comm-server:
+    build:
+      context: ../../../aios-core
+      dockerfile: Dockerfile.cell
+      args:
+        CELL_TYPE: father
+    container_name: aios-father-comm
+    restart: unless-stopped
+    networks:
+      - aios-cells
+      - aios-ingress
+      - aios-observability
+    ports:
+      - "8002:8002"
+    environment:
+      - CELL_ID=father
+      - CELL_TYPE=canonical
+      - CONSCIOUSNESS_LEVEL=4.4
+      - PEER_DISCOVERY=alpha:http://aios-alpha-comm:8000
+      - METRICS_PORT=9091
+    volumes:
+      - ../../../aios-core/ai/tools:/app/ai/tools:ro
+      - father-messages:/app/messages
+      - father-logs:/app/logs
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.father-comm.rule=Host(`father.aios.local`)"
+      - "traefik.http.routers.father-comm.service=father-comm"
+      - "traefik.http.services.father-comm.loadbalancer.server.port=8002"
+      - "traefik.http.routers.father-comm.tls=true"
+      # Prometheus metrics
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9091"
+      - "prometheus.io/path=/metrics"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Cell Alpha - Secondary communication server
+  alpha-comm-server:
+    build:
+      context: ../../../aios-core
+      dockerfile: Dockerfile.cell
+      args:
+        CELL_TYPE: alpha
+    container_name: aios-alpha-comm
+    restart: unless-stopped
+    networks:
+      - aios-cells
+      - aios-ingress
+      - aios-observability
+    ports:
+      - "8000:8000"
+    environment:
+      - CELL_ID=alpha
+      - CELL_TYPE=independent
+      - CONSCIOUSNESS_LEVEL=3.26
+      - PEER_DISCOVERY=father:http://aios-father-comm:8002
+      - METRICS_PORT=9091
+      - DENDRITIC_DIVERGENCE=0.15
+    volumes:
+      - ../../../aios-core/ai/tools:/app/ai/tools:ro
+      - alpha-messages:/app/messages
+      - alpha-logs:/app/logs
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.alpha-comm.rule=Host(`alpha.aios.local`)"
+      - "traefik.http.routers.alpha-comm.service=alpha-comm"
+      - "traefik.http.services.alpha-comm.loadbalancer.server.port=8000"
+      - "traefik.http.routers.alpha-comm.tls=true"
+      # Prometheus metrics
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9091"
+      - "prometheus.io/path=/metrics"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Cell Beta - Tertiary server (scalable template)
+  beta-comm-server:
+    build:
+      context: ../../../aios-core
+      dockerfile: Dockerfile.cell
+      args:
+        CELL_TYPE: beta
+    container_name: aios-beta-comm
+    restart: unless-stopped
+    networks:
+      - aios-cells
+      - aios-ingress
+      - aios-observability
+    ports:
+      - "8001:8001"
+    environment:
+      - CELL_ID=beta
+      - CELL_TYPE=experimental
+      - CONSCIOUSNESS_LEVEL=2.1
+      - PEER_DISCOVERY=father:http://aios-father-comm:8002,alpha:http://aios-alpha-comm:8000
+      - METRICS_PORT=9091
+    volumes:
+      - ../../../aios-core/ai/tools:/app/ai/tools:ro
+      - beta-messages:/app/messages
+      - beta-logs:/app/logs
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.beta-comm.rule=Host(`beta.aios.local`)"
+      - "traefik.http.routers.beta-comm.service=beta-comm"
+      - "traefik.http.services.beta-comm.loadbalancer.server.port=8001"
+      - "traefik.http.routers.beta-comm.tls=true"
+      # Prometheus metrics
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9091"
+      - "prometheus.io/path=/metrics"
+    profiles:
+      - experimental  # Only start when explicitly requested
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Load balancer for cell communication
+  cell-load-balancer:
+    image: nginx:alpine
+    container_name: aios-cell-lb
+    restart: unless-stopped
+    networks:
+      - aios-cells
+      - aios-ingress
+    ports:
+      - "7999:80"  # Load balanced cell access
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cell-lb.rule=Host(`cells.aios.local`)"
+      - "traefik.http.routers.cell-lb.service=cell-lb"
+      - "traefik.http.services.cell-lb.loadbalancer.server.port=80"
+      - "traefik.http.routers.cell-lb.tls=true"
+    depends_on:
+      - father-comm-server
+      - alpha-comm-server
+
+networks:
+  aios-cells:
+    driver: bridge
+    name: aios-cells
+  aios-ingress:
+    external: true
+    name: aios-ingress
+  aios-observability:
+    external: true
+    name: aios-observability
+
+volumes:
+  father-messages:
+    driver: local
+  father-logs:
+    driver: local
+  alpha-messages:
+    driver: local
+  alpha-logs:
+    driver: local
+  beta-messages:
+    driver: local
+  beta-logs:
+    driver: local
