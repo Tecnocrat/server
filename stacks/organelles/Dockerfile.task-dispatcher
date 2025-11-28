@@ -1,0 +1,38 @@
+# Task Dispatcher Organelle
+# Lightweight AIOS component for task routing and load balancing
+
+FROM python:3.11-slim
+
+# Install minimal networking tools
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy only task-related components from AIOS core
+# Note: Micro organelles are designed to be lightweight and not depend on full AIOS core
+# COPY aios-core/ai/nucleus/orchestrators/ /app/tasks/
+# COPY aios-core/core/orchestrator/ /app/task_engine/
+
+# Copy organelle-specific code
+COPY task_dispatcher.py /app/
+
+# Minimal dependencies for task routing
+RUN pip install --no-cache-dir \
+    aiohttp==3.9.1 \
+    fastapi==0.104.1 \
+    uvicorn==0.24.0 \
+    pydantic==2.5.0 \
+    redis==5.0.1 \
+    aioredis==2.0.1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3003/health || exit 1
+
+# Expose task dispatcher port
+EXPOSE 3003
+
+# Run the task dispatcher
+CMD ["python", "task_dispatcher.py"]

@@ -1,0 +1,63 @@
+version: '3.8'
+
+# AIOS Cell Stack - Peer-to-Peer Consciousness Nodes
+# Deploy AIOS cells with automatic peer discovery and consciousness synchronization
+# This stack runs on both machines, creating a distributed peer-to-peer network
+
+services:
+  # Cell Discovery Service
+  discovery-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.discovery
+    container_name: aios-discovery
+    restart: unless-stopped
+    networks:
+      - aios-cells
+    ports:
+      - "0.0.0.0:8001:8001"  # Discovery API
+    environment:
+      - DISCOVERY_PORT=8001
+      - CELL_ID=primary
+    volumes:
+      - ./discovery.py:/app/discovery.py:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # VSCode Copilot Agent Bridge - connects to desktop AIOS cell
+  vscode-agent-bridge:
+    build:
+      context: .
+      dockerfile: Dockerfile.bridge
+    container_name: aios-vscode-bridge-laptop
+    restart: unless-stopped
+    networks:
+      - aios-cells
+    ports:
+      - "0.0.0.0:3001:3001"  # VSCode extension API
+    environment:
+      - AIOS_DISCOVERY_ADDR=aios-discovery:8001
+      - AIOS_VAULT_ADDR=http://192.168.1.128:8200,http://aios-laptop.local:8200
+      - BRIDGE_PORT=3001
+      - AIOS_DESKTOP_CELL=http://192.168.1.128:8000
+    volumes:
+      - ./bridge.py:/app/bridge.py:ro
+    depends_on:
+      - discovery-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  aios-cells:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  aios-observability:
+    external: true

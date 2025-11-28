@@ -1,0 +1,52 @@
+# AIOS Cell Dockerfile
+# Multi-language AIOS cell with Python AI and C++ core integration
+
+FROM python:3.11-slim
+
+# Install system dependencies for C++ compilation and networking
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    git \
+    curl \
+    net-tools \
+    iputils-ping \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy Python requirements first for better caching
+COPY aios-core/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy AIOS core source code
+COPY aios-core/ /app/aios-core/
+COPY cell_server.py /app/
+
+# Build C++ core components if needed
+RUN if [ -f "core/CMakeLists.txt" ]; then \
+        mkdir -p core/build && \
+        cd core/build && \
+        cmake .. && \
+        make -j$(nproc); \
+    fi
+
+# Create data and logs directories
+RUN mkdir -p data logs
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV AIOS_CELL_ID=primary
+ENV AIOS_BRANCH=main
+ENV AIOS_PEER_DISCOVERY=true
+
+# Expose ports
+EXPOSE 8000 9091
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Start the AIOS cell
+CMD ["python", "cell_server.py"]
