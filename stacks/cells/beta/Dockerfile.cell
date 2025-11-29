@@ -17,12 +17,16 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy Python requirements first for better caching
+COPY server/stacks/cells/requirements-cell.txt .
+RUN pip install --no-cache-dir -r requirements-cell.txt
+
+# Also install core requirements for shared dependencies
 COPY aios-core/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy AIOS core source code
 COPY aios-core/ /app/aios-core/
-COPY cell_server.py /app/
+COPY server/stacks/cells/cell_server.py /app/
 
 # Build C++ core components if needed
 RUN if [ -f "core/CMakeLists.txt" ]; then \

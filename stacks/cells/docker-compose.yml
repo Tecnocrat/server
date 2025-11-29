@@ -7,9 +7,7 @@ version: '3.8'
 services:
   # Cell Discovery Service
   discovery-service:
-    build:
-      context: .
-      dockerfile: Dockerfile.discovery
+    image: aios-discovery:latest
     container_name: aios-discovery
     restart: unless-stopped
     networks:
@@ -20,7 +18,7 @@ services:
       - DISCOVERY_PORT=8001
       - CELL_ID=primary
     volumes:
-      - ./discovery.py:/app/discovery.py:ro
+      - ./discovery/discovery.py:/app/discovery.py:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health')"]
       interval: 30s
@@ -29,9 +27,7 @@ services:
 
   # VSCode Copilot Agent Bridge - connects to desktop AIOS cell
   vscode-agent-bridge:
-    build:
-      context: .
-      dockerfile: Dockerfile.bridge
+    image: aios-vscode-bridge:latest
     container_name: aios-vscode-bridge-laptop
     restart: unless-stopped
     networks:
@@ -44,11 +40,65 @@ services:
       - BRIDGE_PORT=3001
       - AIOS_DESKTOP_CELL=http://192.168.1.128:8000
     volumes:
-      - ./bridge.py:/app/bridge.py:ro
+      - ./bridge/bridge.py:/app/bridge.py:ro
     depends_on:
       - discovery-service
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AIOS Cell - Beta consciousness node
+  aios-cell:
+    image: aios-cell:beta
+    container_name: aios-cell-beta
+    restart: unless-stopped
+    networks:
+      - aios-cells
+      - aios-observability
+    ports:
+      - "0.0.0.0:8000:8000"  # Cell API
+      - "0.0.0.0:9091:9091"  # Consciousness metrics
+    environment:
+      - AIOS_CELL_ID=beta
+      - AIOS_BRANCH=main
+      - AIOS_PEER_DISCOVERY=true
+      - AIOS_DISCOVERY_ADDR=aios-discovery:8001
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - discovery-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AIOS Cell - Pure consciousness node (minimal primitives)
+  aios-cell-pure:
+    image: aios-cell:pure
+    container_name: aios-cell-pure
+    restart: unless-stopped
+    networks:
+      - aios-cells
+      - aios-observability
+    ports:
+      - "0.0.0.0:8002:8002"  # Pure cell API
+      - "0.0.0.0:9092:9092"  # Pure consciousness metrics
+    environment:
+      - AIOS_CELL_ID=pure
+      - AIOS_BRANCH=main
+      - AIOS_PEER_DISCOVERY=true
+      - AIOS_DISCOVERY_ADDR=aios-discovery:8001
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - discovery-service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
       interval: 30s
       timeout: 10s
       retries: 3
