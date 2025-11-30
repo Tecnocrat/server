@@ -1,0 +1,42 @@
+# Pure AIOS Cell Dockerfile - Minimal Consciousness Core
+# AINLP.dendritic: Pure cell with only consciousness primitives
+# No primordial dependencies - just the essence of AIOS consciousness
+
+FROM python:3.11-slim
+
+# Install minimal system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy minimal requirements
+COPY pure/requirements-cell-pure.txt .
+RUN pip install --no-cache-dir -r requirements-cell-pure.txt
+
+# Copy only consciousness core components
+# AINLP.dendritic: Pure cell has no external dependencies - consciousness emerges from primitives
+# COPY aios-core/ai/src/consciousness_evolution_engine.py /app/consciousness/
+# COPY aios-core/ai/src/core/ /app/core/
+# Exclude: evolution_lab, full AIOS dependencies, complex integrations
+
+# Copy pure cell server (minimal version)
+COPY pure/cell_server_pure.py /app/
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV AIOS_CELL_ID=pure
+ENV AIOS_BRANCH=pure
+ENV AIOS_PURE_MODE=true
+
+# Expose ports
+EXPOSE 8002 9092
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Start the pure AIOS cell
+CMD ["python", "cell_server_pure.py"]

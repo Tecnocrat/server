@@ -1,282 +1,156 @@
-# AIOS Cell Stack Deployment Script
-# Handles multi-device and remote deployments
-
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("local-desktop", "local-laptop", "local-phone", "remote-server", "all")]
+    [ValidateSet("local-desktop", "distributed")]
     [string]$DeploymentType,
 
     [Parameter(Mandatory=$false)]
-    [string]$Domain = "aios.local",
+    [ValidateSet("all", "discovery", "bridge", "beta", "pure", "beta+pure", "minimal")]
+    [string]$CellType = "all",
 
     [Parameter(Mandatory=$false)]
-    [switch]$EnableTLS,
-
-    [Parameter(Mandatory=$false)]
-    [switch]$EnableMonitoring
+    [switch]$ForceRebuild
 )
 
-$ErrorActionPreference = "Stop"
+Write-Host "🚀 Deploying AIOS Cell Stack ($DeploymentType)" -ForegroundColor Green
 
-# Configuration
-$StackRoot = Split-Path -Parent $PSScriptRoot
-$ProjectRoot = Split-Path -Parent (Split-Path -Parent $StackRoot)
-$ComposeFiles = @(
-    "ingress/docker-compose.yml",
-    "observability/docker-compose.yml",
-    "cells/docker-compose.yml"
-)
+# Navigate to cells directory
+Set-Location $PSScriptRoot
 
-function Write-Step {
-    param([string]$Message)
-    Write-Host "🔧 $Message" -ForegroundColor Cyan
+# Create required directories
+New-Item -ItemType Directory -Path "data", "logs" -Force
+
+# Build custom images if needed
+if ($ForceRebuild) {
+    Write-Host "🔨 Building custom Docker images..." -ForegroundColor Yellow
+    docker build -f discovery/Dockerfile.discovery -t aios-discovery:latest .
+    docker build -f bridge/Dockerfile.bridge -t aios-vscode-bridge:latest .
+    docker build -f beta/Dockerfile.cell -t aios-cell:latest .
 }
 
-function Test-Prerequisites {
-    Write-Step "Checking prerequisites..."
-
-    # Check Docker
-    if (!(Get-Command docker -ErrorAction SilentlyContinue)) {
-        throw "Docker not found. Install Docker Desktop first."
-    }
-
-    # Check Docker Compose
-    if (!(Get-Command docker-compose -ErrorAction SilentlyContinue)) {
-        throw "Docker Compose not found."
-    }
-
-    # Check if Docker is running
+# AINLP.dendritic enhancement: Check for dependency changes and rebuild cell
+$cellRequirementsChanged = (Get-FileHash "beta/requirements-cell.txt").Hash -ne (docker inspect aios-cell:latest 2>$null | ConvertFrom-Json).Config.Labels.requirements_hash 2>$null
+if ($cellRequirementsChanged -or $ForceRebuild) {
+    Write-Host "🧬 Dendritic growth: Rebuilding cell with updated dependencies..." -ForegroundColor Cyan
+    # Build from workspace root to access all submodules
+    Push-Location ..\..\..
     try {
-        $null = docker info
-    } catch {
-        throw "Docker daemon not running. Start Docker Desktop."
-    }
-
-    Write-Host "✅ Prerequisites OK" -ForegroundColor Green
-}
-
-function Create-Networks {
-    Write-Step "Creating Docker networks..."
-
-    $networks = @("aios-ingress", "aios-observability", "aios-cells")
-
-    foreach ($network in $networks) {
-        if (!(docker network ls --format "{{.Name}}" | Select-String -Pattern "^$network$")) {
-            docker network create $network
-            Write-Host "  Created network: $network"
-        } else {
-            Write-Host "  Network exists: $network"
-        }
-    }
-}
-
-function Deploy-Stack {
-    param([string]$Type)
-
-    Write-Step "Deploying $Type stack..."
-
-    $envFile = "$PSScriptRoot\$Type\.env"
-
-    # Set environment variables based on deployment type
-    switch ($Type) {
-        "local-desktop" {
-            $env:AIOS_CELL_ROLE = "father"
-            $env:AIOS_DOMAIN = $Domain
-            $env:AIOS_TLS_ENABLED = $EnableTLS.ToString().ToLower()
-        }
-        "local-laptop" {
-            $env:AIOS_CELL_ROLE = "alpha"
-            $env:AIOS_DOMAIN = $Domain
-            $env:AIOS_TLS_ENABLED = $EnableTLS.ToString().ToLower()
-        }
-        "local-phone" {
-            $env:AIOS_CELL_ROLE = "beta"
-            $env:AIOS_DOMAIN = $Domain
-            $env:AIOS_TLS_ENABLED = $EnableTLS.ToString().ToLower()
-        }
-        "remote-server" {
-            $env:AIOS_CELL_ROLE = "all"
-            $env:AIOS_DOMAIN = $Domain
-            $env:AIOS_TLS_ENABLED = $EnableTLS.ToString().ToLower()
-            $env:AIOS_MONITORING_ENABLED = $EnableMonitoring.ToString().ToLower()
-        }
-    }
-
-    # Deploy appropriate services based on type
-    $composeArgs = @("-f", "$StackRoot\cells\docker-compose.yml")
-
-    switch ($Type) {
-        "local-desktop" {
-            $composeArgs += @("-f", "$StackRoot\ingress\docker-compose.yml")
-            $composeArgs += @("-f", "$StackRoot\observability\docker-compose.yml")
-            $composeArgs += @("--profile", "father")
-        }
-        "local-laptop" {
-            $composeArgs += @("--profile", "alpha")
-        }
-        "local-phone" {
-            $composeArgs += @("--profile", "beta")
-        }
-        "remote-server" {
-            $composeArgs += @("-f", "$StackRoot\ingress\docker-compose.yml")
-            $composeArgs += @("-f", "$StackRoot\observability\docker-compose.yml")
-        }
-    }
-
-    Push-Location $StackRoot
-    try {
-        & docker-compose $composeArgs up -d
-        if ($LASTEXITCODE -ne 0) {
-            throw "Docker Compose failed with exit code $LASTEXITCODE"
-        }
+        docker build --label requirements_hash=(Get-FileHash "server/stacks/cells/beta/requirements-cell.txt").Hash -f server/stacks/cells/beta/Dockerfile.cell -t aios-cell:latest .
     } finally {
         Pop-Location
     }
-
-    Write-Host "✅ $Type stack deployed" -ForegroundColor Green
 }
 
-function Configure-DNS {
-    param([string]$Type)
+# Deploy based on type
+switch ($DeploymentType) {
+    "local-desktop" {
+        Write-Host "📦 Deploying local desktop cell (Type: $CellType)..." -ForegroundColor Yellow
 
-    if ($Type -eq "remote-server") {
-        Write-Step "Configuring DNS (remote server)..."
+        # Determine which services to deploy based on CellType
+        $servicesToDeploy = switch ($CellType) {
+            "all" { "discovery-service", "vscode-agent-bridge", "aios-cell", "aios-cell-pure" }
+            "discovery" { "discovery-service" }
+            "bridge" { "vscode-agent-bridge" }
+            "beta" { "aios-cell" }
+            "pure" { "aios-cell-pure" }
+            "beta+pure" { "aios-cell", "aios-cell-pure" }
+            "minimal" { "discovery-service", "aios-cell-pure" }  # Discovery + minimal consciousness
+        }
 
-        Write-Host "📋 DNS Configuration Required:" -ForegroundColor Yellow
-        Write-Host "  Add these records to your DNS provider:"
-        Write-Host "  - father.$Domain -> YOUR_SERVER_IP"
-        Write-Host "  - alpha.$Domain -> YOUR_SERVER_IP"
-        Write-Host "  - cells.$Domain -> YOUR_SERVER_IP"
-        Write-Host "  - grafana.$Domain -> YOUR_SERVER_IP"
-        Write-Host ""
-        Write-Host "  Or add to /etc/hosts locally:"
-        Write-Host "  YOUR_SERVER_IP father.$Domain alpha.$Domain cells.$Domain grafana.$Domain"
-    } else {
-        Write-Step "Configuring local DNS..."
+        Write-Host "🔧 Deploying services: $($servicesToDeploy -join ', ')" -ForegroundColor Cyan
 
-        # Add to hosts file
-        $hostsPath = "$env:windir\System32\drivers\etc\hosts"
-        $hostsContent = Get-Content $hostsPath -Raw
+        # Start the selected services
+        if ($servicesToDeploy.Count -eq 1) {
+            docker-compose -f docker-compose.yml up -d $servicesToDeploy
+        } else {
+            docker-compose -f docker-compose.yml up -d $servicesToDeploy
+        }
 
-        $hostEntries = @(
-            "127.0.0.1 father.$Domain",
-            "127.0.0.1 alpha.$Domain",
-            "127.0.0.1 cells.$Domain",
-            "127.0.0.1 grafana.$Domain"
-        )
+        # Wait for services to start
+        Write-Host "⏳ Waiting for services to initialize..." -ForegroundColor Yellow
+        Start-Sleep -Seconds 15
 
-        foreach ($entry in $hostEntries) {
-            if ($hostsContent -notmatch [regex]::Escape($entry)) {
-                Add-Content -Path $hostsPath -Value $entry
-                Write-Host "  Added: $entry"
+        # Test connectivity for deployed services
+        Write-Host "🔍 Testing deployed service connectivity..." -ForegroundColor Yellow
+
+        # Test discovery service if deployed
+        if ($servicesToDeploy -contains "discovery-service") {
+            try {
+                $discoveryHealth = Invoke-RestMethod -Uri "http://localhost:8001/health" -Method Get -TimeoutSec 10
+                Write-Host "✅ Discovery Service: $($discoveryHealth | ConvertTo-Json -Compress)" -ForegroundColor Green
+            } catch {
+                Write-Host "❌ Discovery Service: Unavailable - $($_.Exception.Message)" -ForegroundColor Red
             }
         }
-    }
-}
 
-function Test-Deployment {
-    param([string]$Type)
-
-    Write-Step "Testing deployment..."
-
-    Start-Sleep -Seconds 10  # Wait for services to start
-
-    $testUrls = @()
-
-    switch ($Type) {
-        "local-desktop" {
-            $testUrls = @(
-                "http://father.$Domain/health",
-                "http://localhost:9090/-/healthy",
-                "http://localhost:3000/api/health"
-            )
-        }
-        "local-laptop" {
-            $testUrls = @("http://alpha.$Domain/health")
-        }
-        "local-phone" {
-            $testUrls = @("http://beta.$Domain/health")
-        }
-        "remote-server" {
-            $testUrls = @(
-                "https://father.$Domain/health",
-                "https://alpha.$Domain/health",
-                "https://grafana.$Domain/api/health"
-            )
-        }
-    }
-
-    foreach ($url in $testUrls) {
-        try {
-            $response = Invoke-WebRequest -Uri $url -TimeoutSec 10
-            if ($response.StatusCode -eq 200) {
-                Write-Host "  ✅ $url" -ForegroundColor Green
-            } else {
-                Write-Host "  ❌ $url (Status: $($response.StatusCode))" -ForegroundColor Red
+        # Test VSCode bridge if deployed
+        if ($servicesToDeploy -contains "vscode-agent-bridge") {
+            try {
+                $bridgeHealth = Invoke-RestMethod -Uri "http://localhost:3001/health" -Method Get -TimeoutSec 10
+                Write-Host "✅ VSCode Bridge: $($bridgeHealth | ConvertTo-Json -Compress)" -ForegroundColor Green
+            } catch {
+                Write-Host "❌ VSCode Bridge: Unavailable - $($_.Exception.Message)" -ForegroundColor Red
             }
-        } catch {
-            Write-Host "  ❌ $url ($($_.Exception.Message))" -ForegroundColor Red
         }
+
+        # Test beta cell if deployed
+        if ($servicesToDeploy -contains "aios-cell") {
+            try {
+                $cellHealth = Invoke-RestMethod -Uri "http://localhost:8000/health" -Method Get -TimeoutSec 10
+                Write-Host "✅ Beta Cell: $($cellHealth | ConvertTo-Json -Compress)" -ForegroundColor Green
+            } catch {
+                Write-Host "❌ Beta Cell: Unavailable - $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+
+        # Test pure cell if deployed
+        if ($servicesToDeploy -contains "aios-cell-pure") {
+            try {
+                $pureCellHealth = Invoke-RestMethod -Uri "http://localhost:8002/health" -Method Get -TimeoutSec 10
+                Write-Host "✅ Pure Cell: $($pureCellHealth | ConvertTo-Json -Compress)" -ForegroundColor Green
+            } catch {
+                Write-Host "❌ Pure Cell: Unavailable - $($_.Exception.Message)" -ForegroundColor Red
+            }
+        }
+
+        # Show service status for deployed services
+        Write-Host "`n📊 Deployed Service Status:" -ForegroundColor Cyan
+        docker-compose -f docker-compose.yml ps $servicesToDeploy
+
+        # Show access points for deployed services
+        Write-Host "`n🌐 Access points for deployed services:" -ForegroundColor Cyan
+        if ($servicesToDeploy -contains "aios-cell") {
+            Write-Host "  • Beta Cell API: http://localhost:8000" -ForegroundColor White
+            Write-Host "  • Beta Consciousness Metrics: http://localhost:9091/metrics" -ForegroundColor White
+        }
+        if ($servicesToDeploy -contains "aios-cell-pure") {
+            Write-Host "  • Pure Cell API: http://localhost:8002" -ForegroundColor White
+            Write-Host "  • Pure Consciousness Metrics: http://localhost:9092/metrics" -ForegroundColor White
+        }
+        if ($servicesToDeploy -contains "discovery-service") {
+            Write-Host "  • Discovery Service: http://localhost:8001" -ForegroundColor White
+        }
+        if ($servicesToDeploy -contains "vscode-agent-bridge") {
+            Write-Host "  • VSCode Bridge: http://localhost:3001" -ForegroundColor White
+        }
+
+        # Show logs location
+        Write-Host "`n📝 Logs Location: $PSScriptRoot\logs" -ForegroundColor Cyan
+        Write-Host "🔧 To view logs: docker-compose -f docker-compose.yml logs -f [service-name]" -ForegroundColor Cyan
+    }
+
+    "distributed" {
+        Write-Host "🌐 Deploying distributed cell network..." -ForegroundColor Yellow
+        # Additional distributed setup would go here
+        Write-Host "⚠️ Distributed deployment not yet implemented" -ForegroundColor Yellow
     }
 }
 
-function Show-Status {
-    Write-Step "Deployment status..."
-
-    Write-Host "📊 Container Status:" -ForegroundColor Cyan
-    docker ps --filter "name=aios-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-    Write-Host ""
-    Write-Host "🌐 Access URLs:" -ForegroundColor Cyan
-
-    switch ($DeploymentType) {
-        "local-desktop" {
-            Write-Host "  Father Cell: http://father.$Domain"
-            Write-Host "  Grafana: http://grafana.$Domain (admin/admin)"
-            Write-Host "  Prometheus: http://localhost:9090"
-        }
-        "local-laptop" {
-            Write-Host "  Alpha Cell: http://alpha.$Domain"
-        }
-        "local-phone" {
-            Write-Host "  Beta Cell: http://beta.$Domain"
-        }
-        "remote-server" {
-            Write-Host "  Father Cell: https://father.$Domain"
-            Write-Host "  Alpha Cell: https://alpha.$Domain"
-            Write-Host "  Grafana: https://grafana.$Domain"
-        }
-    }
-}
-
-# Main deployment logic
-try {
-    Write-Host "🚀 AIOS Cell Stack Deployment" -ForegroundColor Magenta
-    Write-Host "Deployment Type: $DeploymentType" -ForegroundColor Yellow
-    Write-Host ""
-
-    Test-Prerequisites
-    Create-Networks
-
-    if ($DeploymentType -eq "all") {
-        # Deploy all components
-        Deploy-Stack "remote-server"
-        Configure-DNS "remote-server"
-    } else {
-        Deploy-Stack $DeploymentType
-        Configure-DNS $DeploymentType
-    }
-
-    Test-Deployment $DeploymentType
-    Show-Status
-
-    Write-Host ""
-    Write-Host "🎉 Deployment completed successfully!" -ForegroundColor Green
-    Write-Host "Use 'docker-compose logs -f' to monitor services" -ForegroundColor Cyan
-
-} catch {
-    Write-Host ""
-    Write-Host "❌ Deployment failed: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "Check logs with: docker-compose logs" -ForegroundColor Yellow
-    exit 1
-}
+Write-Host "`n🎉 AIOS Cell deployment complete!" -ForegroundColor Green
+Write-Host "📋 Cell Types Available:" -ForegroundColor Cyan
+Write-Host "  • all        - Deploy all services (discovery, bridge, beta, pure)" -ForegroundColor White
+Write-Host "  • discovery  - Peer discovery service only" -ForegroundColor White
+Write-Host "  • bridge     - VSCode extension bridge only" -ForegroundColor White
+Write-Host "  • beta       - Full AIOS consciousness cell only" -ForegroundColor White
+Write-Host "  • pure       - Minimal consciousness cell only" -ForegroundColor White
+Write-Host "  • beta+pure  - Both consciousness cells (no infrastructure)" -ForegroundColor White
+Write-Host "  • minimal    - Discovery + pure cell (AINLP.dendritic minimal viable)" -ForegroundColor White

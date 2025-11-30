@@ -1,0 +1,36 @@
+# VSCode Bridge Organelle
+# Lightweight AIOS component for VSCode Copilot integration
+
+FROM python:3.11-slim
+
+# Install minimal networking tools
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy only VSCode-related components from AIOS core
+# Note: Micro organelles are designed to be lightweight and not depend on full AIOS core
+# COPY aios-core/ai/nucleus/interface_bridge.py /app/interface/
+# COPY aios-core/ai/nucleus/consciousness/analyzer.py /app/consciousness/
+
+# Copy organelle-specific code
+COPY vscode_bridge.py /app/
+
+# Minimal dependencies
+RUN pip install --no-cache-dir \
+    aiohttp==3.9.1 \
+    fastapi==0.104.1 \
+    uvicorn==0.24.0 \
+    pydantic==2.5.0
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:3001/health || exit 1
+
+# Expose VSCode API port
+EXPOSE 3001
+
+# Run the VSCode bridge
+CMD ["python", "vscode_bridge.py"]
