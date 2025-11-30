@@ -78,7 +78,7 @@ def _check_framework_availability(framework_name: str) -> bool:
         import importlib.util
         spec = importlib.util.find_spec(framework_name)
         return spec is not None
-    except Exception:
+    except (ImportError, ModuleNotFoundError, ValueError):
         return False
 
 
@@ -279,7 +279,7 @@ class DendriticTypeSystem:
 
             return min(final_consciousness, base_level)
 
-        except Exception as e:
+        except (ImportError, AttributeError, TypeError) as e:
             logger.warning(
                 "AINLP.dendritic: Consciousness analysis failed: %s", e
             )
@@ -292,7 +292,7 @@ class DendriticTypeSystem:
             import importlib.util
             spec = importlib.util.find_spec(module_name)
             return spec is not None
-        except Exception:
+        except (ImportError, ModuleNotFoundError, ValueError):
             return False
 
     def _evaluate_dependencies(self, dependencies: List[str]) -> float:
@@ -587,7 +587,7 @@ class VSCodeBridgeOrganelle:
                 await self.session.close()
             logger.info("VSCode Bridge Organelle stopped (aiohttp)")
 
-        async def health_check(http_request):
+        async def health_check(_http_request):
             """Health check endpoint"""
             return web.json_response({
                 "status": "healthy",
@@ -606,14 +606,14 @@ class VSCodeBridgeOrganelle:
                     "success": True,
                     "result": result
                 })
-            except Exception as e:
+            except (ValueError, TypeError, KeyError) as e:
                 logger.error("VSCode request failed: %s", e)
                 return web.json_response({
                     "success": False,
                     "error": str(e)
                 }, status=500)
 
-        async def get_introspection(http_request):
+        async def get_introspection(_http_request):
             """System introspection endpoint"""
             return web.json_response({
                 "organelle_info": self.introspection_data,
@@ -673,7 +673,7 @@ class VSCodeBridgeOrganelle:
             try:
                 result = await self.process_vscode_request(vscode_req)
                 return VSCodeResponse(success=True, result=result)
-            except Exception as e:
+            except (ValueError, TypeError, KeyError) as e:
                 logger.error("VSCode request failed: %s", e)
                 return VSCodeResponse(success=False, error=str(e))
 
@@ -713,7 +713,7 @@ class VSCodeBridgeOrganelle:
                 f"{self.desktop_url}/health", timeout=5
             ) as resp:
                 return resp.status == 200
-        except Exception as e:
+        except (OSError, asyncio.TimeoutError) as e:
             logger.warning("Desktop connection check failed: %s", e)
             return False
 

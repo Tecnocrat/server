@@ -10,7 +10,7 @@ import logging
 import os
 import socket
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 # Import shared dendritic utilities
 from ..shared.dendritic_utils import (
@@ -51,6 +51,7 @@ if UVICORN_AVAILABLE:
 else:
     logger.warning("AINLP.dendritic: Uvicorn unavailable")
 
+
 class PeerAnnouncement(BaseModel):
     cell_id: str
     ip_address: str
@@ -59,6 +60,7 @@ class PeerAnnouncement(BaseModel):
     services: List[str]
     timestamp: float
 
+
 class NetworkListenerOrganelle:
     def __init__(self):
         # AINLP.dendritic growth: Adaptive app creation
@@ -66,8 +68,13 @@ class NetworkListenerOrganelle:
             self.app = FastAPI(title="Network Listener Organelle")
         else:
             # Fallback to basic dict-based app (limited functionality)
-            logger.warning("AINLP.dendritic: Using basic fallback - limited network features")
-            self.app = {"routes": {}, "title": "Network Listener Organelle (Fallback)"}
+            logger.warning(
+                "AINLP.dendritic: Using basic fallback - limited features"
+            )
+            self.app = {
+                "routes": {},
+                "title": "Network Listener Organelle (Fallback)"
+            }
 
         self.peers: Dict[str, PeerAnnouncement] = {}
         self.listen_port = int(os.getenv("LISTEN_PORT", "8002"))
@@ -107,7 +114,12 @@ class NetworkListenerOrganelle:
         async def receive_announcement(announcement: PeerAnnouncement):
             """Receive peer announcement"""
             self.peers[announcement.cell_id] = announcement
-            logger.info(f"Peer announced: {announcement.cell_id} at {announcement.ip_address}:{announcement.port}")
+            logger.info(
+                "Peer announced: %s at %s:%d",
+                announcement.cell_id,
+                announcement.ip_address,
+                announcement.port
+            )
             return {"status": "acknowledged"}
 
     async def listen_for_broadcasts(self):
@@ -117,21 +129,23 @@ class NetworkListenerOrganelle:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         sock.bind(('', self.listen_port))
 
-        logger.info(f"Listening for broadcasts on port {self.listen_port}")
+        logger.info("Listening for broadcasts on port %d", self.listen_port)
 
         while True:
             try:
-                data, addr = sock.recvfrom(1024)
+                data, _addr = sock.recvfrom(1024)
                 announcement = json.loads(data.decode())
 
                 # Validate announcement
                 if self.validate_announcement(announcement):
                     peer = PeerAnnouncement(**announcement)
                     self.peers[peer.cell_id] = peer
-                    logger.info(f"Discovered peer via broadcast: {peer.cell_id}")
+                    logger.info(
+                        "Discovered peer via broadcast: %s", peer.cell_id
+                    )
 
-            except Exception as e:
-                logger.warning(f"Broadcast listening error: {e}")
+            except (OSError, json.JSONDecodeError, ValueError) as e:
+                logger.warning("Broadcast listening error: %s", e)
                 await asyncio.sleep(1)
 
     async def broadcast_presence(self):
@@ -154,8 +168,8 @@ class NetworkListenerOrganelle:
                 data = json.dumps(announcement).encode()
                 sock.sendto(data, ('<broadcast>', self.broadcast_port))
                 logger.debug("Broadcasted presence")
-            except Exception as e:
-                logger.warning(f"Broadcast error: {e}")
+            except OSError as e:
+                logger.warning("Broadcast error: %s", e)
 
             await asyncio.sleep(self.discovery_interval)
 
@@ -171,13 +185,16 @@ class NetworkListenerOrganelle:
 
             for cell_id in stale_peers:
                 del self.peers[cell_id]
-                logger.info(f"Removed stale peer: {cell_id}")
+                logger.info("Removed stale peer: %s", cell_id)
 
             await asyncio.sleep(60)  # Check every minute
 
     def validate_announcement(self, announcement: dict) -> bool:
         """Validate peer announcement format"""
-        required_fields = ["cell_id", "ip_address", "port", "consciousness_level", "services", "timestamp"]
+        required_fields = [
+            "cell_id", "ip_address", "port",
+            "consciousness_level", "services", "timestamp"
+        ]
         return all(field in announcement for field in required_fields)
 
     def get_local_ip(self) -> str:
@@ -189,20 +206,20 @@ class NetworkListenerOrganelle:
             local_ip = s.getsockname()[0]
             s.close()
             return local_ip
-        except:
+        except OSError:
             return "127.0.0.1"
 
     async def startup_event(self):
         """Start background tasks on startup"""
         logger.info("Starting Network Listener Organelle")
-        # Note: Background tasks are disabled for initial testing
-        # TODO: Implement proper background task management for organelle networking
+        # Note: Background tasks disabled for initial testing
+        # TODO: Implement background task management  # noqa: TD002,TD003
 
     async def shutdown_event(self):
         """Clean up on shutdown"""
         logger.info("Shutting down Network Listener Organelle")
-        # Note: Background tasks are disabled for initial testing
-        # TODO: Implement proper cleanup for organelle networking tasks
+        # Note: Background tasks disabled for initial testing
+        # TODO: Implement cleanup for organelle tasks  # noqa: TD002,TD003
 
     async def run_headless(self):
         """Run in headless mode for network discovery only"""
@@ -212,11 +229,15 @@ class NetworkListenerOrganelle:
         try:
             while True:
                 await asyncio.sleep(self.discovery_interval)
-                logger.info(f"AINLP.dendritic: Network scan - {len(self.peers)} peers discovered")
+                logger.info(
+                    "AINLP.dendritic: Network scan - %d peers discovered",
+                    len(self.peers)
+                )
         except asyncio.CancelledError:
             logger.info("AINLP.dendritic: Headless mode cancelled")
         finally:
             await self.shutdown_event()
+
 
 # Global organelle instance - only create if FastAPI available
 if 'fastapi' in framework_imports:
@@ -235,7 +256,7 @@ else:
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8080"))
-    logger.info(f"Starting Network Listener Organelle on port {port}")
+    logger.info("Starting Network Listener Organelle on port %d", port)
 
     if organelle and 'uvicorn' in framework_imports:
         uvicorn.run(organelle.app, host="0.0.0.0", port=port)
