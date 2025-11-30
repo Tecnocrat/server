@@ -11,11 +11,11 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Install Python dependencies
-COPY requirements-discovery.txt .
+COPY discovery/requirements-discovery.txt .
 RUN pip install --no-cache-dir -r requirements-discovery.txt
 
 # Copy application code
-COPY discovery.py .
+COPY discovery/discovery.py .
 
 # Create directories and non-root user
 RUN mkdir -p /app/config && \
