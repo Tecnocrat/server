@@ -18,6 +18,12 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
 
+# Import shared dendritic utilities
+from ..shared.dendritic_utils import (
+    DendriticFrameworkDetector,
+    get_base_model
+)
+
 # Configure logging early
 logging.basicConfig(
     level=logging.INFO,
@@ -25,30 +31,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger('consciousness-sync')
 
-# AINLP.dendritic growth: Framework availability detection
-FASTAPI_AVAILABLE = False
-PYDANTIC_AVAILABLE = False
-REDIS_AVAILABLE = False
-AIOHTTP_AVAILABLE = False
-UVICORN_AVAILABLE = False
-
-# AINLP.dendritic growth: Sophisticated availability detection
-def _check_framework_availability(framework_name: str) -> bool:
-    """AINLP.dendritic growth: Enhanced framework availability check"""
-    try:
-        import importlib.util
-        spec = importlib.util.find_spec(framework_name)
-        return spec is not None
-    except Exception:
-        return False
-
-
-# Detect availability with enhanced dendritic logic
-FASTAPI_AVAILABLE = _check_framework_availability('fastapi')
-PYDANTIC_AVAILABLE = _check_framework_availability('pydantic')
-REDIS_AVAILABLE = _check_framework_availability('redis')
-AIOHTTP_AVAILABLE = _check_framework_availability('aiohttp')
-UVICORN_AVAILABLE = _check_framework_availability('uvicorn')
+# AINLP.dendritic growth: Framework detection using shared utilities
+detector = DendriticFrameworkDetector()
+FASTAPI_AVAILABLE = detector.is_available('fastapi')
+PYDANTIC_AVAILABLE = detector.is_available('pydantic')
+REDIS_AVAILABLE = detector.is_available('redis')
+AIOHTTP_AVAILABLE = detector.is_available('aiohttp')
+UVICORN_AVAILABLE = detector.is_available('uvicorn')
 
 # AINLP.dendritic growth: Conditional framework imports
 framework_imports = {}
@@ -66,12 +55,7 @@ if PYDANTIC_AVAILABLE:
     framework_imports['pydantic'] = True
 else:
     logger.warning("AINLP.dendritic: Pydantic unavailable")
-
-    class BaseModel:
-        """Fallback BaseModel"""
-        def __init__(self, **data):
-            for key, value in data.items():
-                setattr(self, key, value)
+    BaseModel = get_base_model()
 
 if REDIS_AVAILABLE:
     import redis.asyncio as redis  # noqa: F401
