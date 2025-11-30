@@ -19,3 +19,6 @@ vault-root-token.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# Vault secrets - NEVER COMMIT
+stacks/secrets/.vault-init.json

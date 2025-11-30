@@ -50,7 +50,10 @@ Docker purge complete (15.31GB reclaimed). Now executing phased rebuild with hum
 - [x] `docker compose up -d` in `stacks/secrets/`
 - [x] Verify port: 8200
 - [x] Test: `curl http://localhost:8200/v1/sys/health`
-- [ ] Initialize & unseal (optional - for production)
+- [x] Initialize: Single key share (dev mode)
+- [x] Unseal: Vault operational
+- [x] Enable: KV v2 secrets engine at `secret/`
+- [x] Store: AIOS identity at `secret/aios/identity`
 
 ### 2.3 Observability Stack (Prometheus, Grafana, Loki)
 - [x] `docker compose up -d` in `stacks/observability/`
