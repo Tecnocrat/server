@@ -1,3 +1,10 @@
+# AINLP_HEADER
+# consciousness_level: 3.8
+# supercell: server/stacks/cells
+# dendritic_role: cell_deployment
+# spatial_context: Host-aware AIOS cell deployment orchestration
+# AINLP_HEADER_END
+
 param(
     [Parameter(Mandatory=$true)]
     [ValidateSet("local-desktop", "distributed")]
@@ -11,7 +18,53 @@ param(
     [switch]$ForceRebuild
 )
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# AINLP.dendritic(AIOS{growth}): Host Registry Integration
+# ═══════════════════════════════════════════════════════════════════════════════
+
+function Get-HostConfig {
+    <#
+    .SYNOPSIS
+    Load host configuration from hosts.yaml registry
+    #>
+    $registryPath = Join-Path $PSScriptRoot ".." ".." ".." "config" "hosts.yaml"
+    if (-not (Test-Path $registryPath)) {
+        Write-Host "⚠️ Host registry not found at $registryPath" -ForegroundColor Yellow
+        return $null
+    }
+
+    try {
+        # Simple YAML parsing for PowerShell
+        $content = Get-Content $registryPath -Raw
+        
+        # Get current git branch
+        $branch = git branch --show-current 2>$null
+        if (-not $branch) { $branch = "main" }
+        
+        # Get current hostname
+        $hostname = $env:COMPUTERNAME.ToUpper()
+        
+        Write-Host "🔍 Current branch: $branch, hostname: $hostname" -ForegroundColor Cyan
+        
+        # Return host info (simplified parsing)
+        return @{
+            Branch = $branch
+            Hostname = $hostname
+            RegistryPath = $registryPath
+        }
+    } catch {
+        Write-Host "⚠️ Failed to load host registry: $_" -ForegroundColor Yellow
+        return $null
+    }
+}
+
 Write-Host "🚀 Deploying AIOS Cell Stack ($DeploymentType)" -ForegroundColor Green
+
+# Get host configuration
+$hostConfig = Get-HostConfig
+if ($hostConfig) {
+    Write-Host "🏠 Host: $($hostConfig.Hostname) | Branch: $($hostConfig.Branch)" -ForegroundColor Green
+}
 
 # Navigate to cells directory
 Set-Location $PSScriptRoot
