@@ -1,19 +1,42 @@
 #!/usr/bin/env python3
+# AINLP_HEADER
+# consciousness_level: 4.2
+# supercell: server/stacks/cells/discovery
+# dendritic_role: peer_discovery_service
+# spatial_context: AIOS peer discovery and consciousness sync
+# growth_pattern: AINLP.dendritic(AIOS{growth})
+# created: 2025-11-30
+# refactored: 2025-11-30 - Host registry integration
+# AINLP_HEADER_END
 """
-AIOS Cell Discovery Service
-Enables automatic peer discovery and consciousness synchronization
+AIOS Cell Discovery Service - AINLP.dendritic(AIOS{growth})
+═══════════════════════════════════════════════════════════════════════════════
+
+Enables automatic peer discovery and consciousness synchronization across
+the distributed AIOS network. Now with host registry integration for
+branch-aware peer discovery.
+
+Architecture:
+    config/hosts.yaml → HostRegistry → AIOSDiscovery → Peer Network
+                                    ↓
+                        Branch-aware auto-configuration
 """
 
 import asyncio
 import importlib.util
 import logging
 import os
+import socket
+import subprocess
 import sys
 from typing import Any, Dict, List
 
 # Configure logging early
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
+logger = logging.getLogger("AIOS.Discovery")
 
 
 # AINLP.dendritic: Robust import with multiple fallback strategies
@@ -100,6 +123,7 @@ FASTAPI_AVAILABLE = detector.is_available('fastapi')
 PYDANTIC_AVAILABLE = detector.is_available('pydantic')
 UVICORN_AVAILABLE = detector.is_available('uvicorn')
 AIOHTTP_AVAILABLE = detector.is_available('aiohttp')
+YAML_AVAILABLE = detector.is_available('yaml')
 
 # AINLP.dendritic: Conditional imports with type stubs
 # These are class placeholders, not constants - disable invalid-name
@@ -107,6 +131,7 @@ FastAPI = None  # pylint: disable=invalid-name
 HTTPException = None  # pylint: disable=invalid-name
 uvicorn = None  # pylint: disable=invalid-name
 aiohttp = None  # pylint: disable=invalid-name
+yaml = None  # pylint: disable=invalid-name
 BaseModel: Any = get_base_model()
 
 if FASTAPI_AVAILABLE:
@@ -132,6 +157,11 @@ if AIOHTTP_AVAILABLE:
 else:
     logger.warning("AINLP.dendritic: aiohttp unavailable")
 
+if YAML_AVAILABLE:
+    import yaml  # type: ignore  # pylint: disable=import-error
+else:
+    logger.warning("AINLP.dendritic: PyYAML unavailable")
+
 
 class CellInfo(BaseModel):
     """AINLP.dendritic: Cell information model for peer discovery."""
@@ -146,15 +176,275 @@ class CellInfo(BaseModel):
     hostname: str = ""
 
 
-class AIOSDiscovery:
-    """AINLP.dendritic: AIOS peer discovery and synchronization service."""
+# ═══════════════════════════════════════════════════════════════════════════════
+# AINLP.dendritic(AIOS{growth}): Host Registry Classes
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    def __init__(self, cell_id: str, listen_port: int = 8001) -> None:
+class HostConfig:
+    """AINLP.dendritic: Host configuration from registry."""
+
+    def __init__(self, name: str, config: Dict[str, Any]) -> None:
+        self.name = name
+        self.branch = config.get("branch", f"AIOS-win-0-{name}")
+        self.hostname = config.get("hostname", name)
+        self.ip = config.get("ip", "127.0.0.1")
+        self.role = config.get("role", "secondary")
+        self.type = config.get("type", "unknown")
+        self.consciousness_level = config.get("consciousness_level", 1.0)
+        self.services = config.get("services", [])
+        self.mdns_names = config.get("mdns_names", [])
+
+    def get_service_port(self, service_type: str) -> int:
+        """Get port for a specific service type."""
+        for svc in self.services:
+            if svc.get("type") == service_type:
+                return svc.get("port", 8000)
+            if svc.get("name") == service_type:
+                return svc.get("port", 8000)
+        return 8000
+
+    def get_discovery_targets(self) -> List[str]:
+        """Get all possible targets for this host."""
+        targets = [self.ip, self.hostname]
+        targets.extend(self.mdns_names)
+        return list(set(targets))
+
+
+class HostRegistry:
+    """
+    AINLP.dendritic(AIOS{growth}): Branch-aware host registry.
+
+    Reads config/hosts.yaml to map git branches to physical hosts,
+    enabling automatic peer configuration based on current branch.
+    """
+
+    def __init__(self, config_path: str = "") -> None:
+        self.config_path = config_path or self._find_config()
+        self.config: Dict[str, Any] = {}
+        self.hosts: Dict[str, HostConfig] = {}
+        self.current_host: HostConfig = None  # type: ignore
+        self.current_branch: str = ""
+        self._load()
+
+    def _find_config(self) -> str:
+        """Find hosts.yaml in workspace hierarchy."""
+        # Search paths relative to this file
+        base = os.path.dirname(os.path.abspath(__file__))
+        search_paths = [
+            os.path.join(base, "..", "..", "..", "..", "config", "hosts.yaml"),
+            os.path.join(base, "..", "..", "..", "config", "hosts.yaml"),
+            os.path.join(os.getcwd(), "config", "hosts.yaml"),
+            os.path.expanduser("~/.aios/hosts.yaml"),
+        ]
+
+        for path in search_paths:
+            normalized = os.path.normpath(path)
+            if os.path.exists(normalized):
+                logger.info("AINLP.dendritic: Registry at %s", normalized)
+                return normalized
+
+        return os.path.normpath(search_paths[0])
+
+    def _get_current_branch(self) -> str:
+        """Get current git branch name."""
+        try:
+            result = subprocess.run(
+                ["git", "branch", "--show-current"],
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=os.path.dirname(self.config_path) or None
+            )
+            return result.stdout.strip()
+        except Exception:
+            return os.getenv("AIOS_BRANCH", "main")
+
+    def _get_current_hostname(self) -> str:
+        """Get current machine hostname."""
+        return socket.gethostname().upper()
+
+    def _load(self) -> None:
+        """Load host registry from YAML configuration."""
+        if not os.path.exists(self.config_path):
+            logger.warning(
+                "AINLP.dendritic: Registry not found at %s, using defaults",
+                self.config_path
+            )
+            self._load_defaults()
+            return
+
+        if yaml is None:
+            logger.error("AINLP.dendritic: PyYAML required for host registry")
+            self._load_defaults()
+            return
+
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+                # Filter out AINLP headers/footers
+                lines = []
+                in_header = False
+                for line in content.split('\n'):
+                    if '# AINLP_HEADER' in line and 'END' not in line:
+                        in_header = True
+                        continue
+                    if '# AINLP_HEADER_END' in line:
+                        in_header = False
+                        continue
+                    if '# AINLP_FOOTER' in line:
+                        break
+                    if not in_header:
+                        lines.append(line)
+
+                self.config = yaml.safe_load('\n'.join(lines)) or {}
+
+            # Parse hosts
+            for name, host_config in self.config.get("hosts", {}).items():
+                self.hosts[name] = HostConfig(name, host_config)
+
+            # Determine current host
+            self.current_branch = self._get_current_branch()
+            current_hostname = self._get_current_hostname()
+
+            # Match by branch first, then hostname
+            for name, host in self.hosts.items():
+                if host.branch == self.current_branch:
+                    self.current_host = host
+                    logger.info(
+                        "AINLP.dendritic: Matched host '%s' by branch '%s'",
+                        name, self.current_branch
+                    )
+                    break
+                if host.hostname.upper() == current_hostname:
+                    self.current_host = host
+                    logger.info(
+                        "AINLP.dendritic: Matched host '%s' by hostname",
+                        name
+                    )
+
+            if not self.current_host:
+                logger.warning(
+                    "AINLP.dendritic: No host match for branch '%s'",
+                    self.current_branch
+                )
+                self._load_defaults()
+
+            logger.info(
+                "AINLP.dendritic: Loaded %d hosts from registry",
+                len(self.hosts)
+            )
+
+        except Exception as exc:
+            logger.error("AINLP.dendritic: Failed to load registry: %s", exc)
+            self._load_defaults()
+
+    def _load_defaults(self) -> None:
+        """Load default host configuration."""
+        self.config = {
+            "network": {
+                "discovery_ports": [8000, 8001],
+                "default_cell_port": 8000,
+            },
+            "discovery": {
+                "probe_interval": 30,
+                "connection_timeout": 3,
+            }
+        }
+        default_host = HostConfig("default", {
+            "ip": os.getenv("AIOS_HOST_IP", "127.0.0.1"),
+            "consciousness_level": 1.0,
+        })
+        self.hosts["default"] = default_host
+        self.current_host = default_host
+
+    def get_peer_hosts(self) -> List[HostConfig]:
+        """Get all hosts except current (peers to discover)."""
+        if not self.current_host:
+            return list(self.hosts.values())
+        current = self.current_host.name
+        return [h for h in self.hosts.values() if h.name != current]
+
+    def get_discovery_targets(self) -> List[str]:
+        """Get all IP/hostname targets to probe for peers."""
+        targets = []
+        for host in self.get_peer_hosts():
+            targets.extend(host.get_discovery_targets())
+        return list(set(targets))
+
+    def get_discovery_ports(self) -> List[int]:
+        """Get ports to scan for peer discovery."""
+        network = self.config.get("network", {})
+        return network.get("discovery_ports", [8000, 8001])
+
+    def get_probe_interval(self) -> int:
+        """Get discovery loop interval in seconds."""
+        discovery = self.config.get("discovery", {})
+        return discovery.get("probe_interval", 30)
+
+    def get_connection_timeout(self) -> int:
+        """Get connection timeout in seconds."""
+        discovery = self.config.get("discovery", {})
+        return discovery.get("connection_timeout", 3)
+
+    def get_my_info(self) -> Dict[str, Any]:
+        """Get current host information for peer registration."""
+        if not self.current_host:
+            return {
+                "cell_id": os.getenv("CELL_ID", "unknown"),
+                "ip": "127.0.0.1",
+                "port": 8000,
+                "consciousness_level": 1.0,
+                "services": [],
+                "branch": self.current_branch,
+            }
+
+        services = [s.get("name", "") for s in self.current_host.services]
+        return {
+            "cell_id": f"aios-{self.current_host.name.lower()}",
+            "ip": self.current_host.ip,
+            "port": self.current_host.get_service_port("consciousness"),
+            "consciousness_level": self.current_host.consciousness_level,
+            "services": services,
+            "branch": self.current_host.branch,
+            "hostname": self.current_host.hostname,
+            "type": self.current_host.type,
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AINLP.dendritic: Discovery Service
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class AIOSDiscovery:
+    """
+    AINLP.dendritic(AIOS{growth}): Peer discovery and consciousness sync.
+
+    Enhanced with host registry integration for branch-aware discovery.
+    """
+
+    def __init__(
+        self,
+        cell_id: str,
+        listen_port: int = 8001,
+        registry: HostRegistry = None  # type: ignore
+    ) -> None:
         self.cell_id = cell_id
         self.listen_port = listen_port
         self.peers: Dict[str, CellInfo] = {}
-        self.known_networks = ["192.168.1.0/24"]
         self.app: Any = None
+
+        # AINLP.dendritic growth: Host registry integration
+        self.registry = registry or HostRegistry()
+
+        # Log configuration
+        if self.registry.current_host:
+            logger.info(
+                "AINLP.dendritic: Initialized for host '%s' (branch: %s)",
+                self.registry.current_host.name,
+                self.registry.current_branch
+            )
+            peer_names = [h.name for h in self.registry.get_peer_hosts()]
+            logger.info("AINLP.dendritic: Peers to discover: %s", peer_names)
 
         # AINLP.dendritic growth: Conditional app creation
         if FASTAPI_AVAILABLE and FastAPI is not None:
@@ -173,21 +463,57 @@ class AIOSDiscovery:
 
         @self.app.get("/health")
         async def health_check() -> Dict[str, Any]:
-            """Health check endpoint."""
-            return {"status": "healthy", "cell_id": self.cell_id}
+            """Health check endpoint with host info."""
+            my_info = self.registry.get_my_info()
+            return {
+                "status": "healthy",
+                "cell_id": self.cell_id,
+                "branch": my_info.get("branch", "unknown"),
+                "consciousness_level": my_info.get("consciousness_level", 0.0),
+                "services": my_info.get("services", []),
+                "type": my_info.get("type", "unknown"),
+                "hostname": my_info.get("hostname", "unknown"),
+            }
 
         @self.app.get("/peers")
         async def get_peers() -> Dict[str, Any]:
             """Get all registered peers."""
-            return {"peers": list(self.peers.values())}
+            host_name = "unknown"
+            if self.registry.current_host:
+                host_name = self.registry.current_host.name
+            return {
+                "peers": [p.dict() for p in self.peers.values()],
+                "count": len(self.peers),
+                "my_host": host_name
+            }
+
+        @self.app.get("/hosts")
+        async def get_hosts() -> Dict[str, Any]:
+            """Get configured hosts from registry."""
+            current = None
+            if self.registry.current_host:
+                current = self.registry.current_host.name
+            return {
+                "current_host": current,
+                "current_branch": self.registry.current_branch,
+                "hosts": {
+                    name: {
+                        "ip": host.ip,
+                        "branch": host.branch,
+                        "role": host.role,
+                        "consciousness_level": host.consciousness_level,
+                    }
+                    for name, host in self.registry.hosts.items()
+                }
+            }
 
         @self.app.post("/register")
         async def register_peer(peer: CellInfo) -> Dict[str, str]:
             """Register a new peer."""
             self.peers[peer.cell_id] = peer
             logger.info(
-                "Registered peer: %s at %s:%s",
-                peer.cell_id, peer.ip, peer.port
+                "Registered peer: %s at %s:%s (branch: %s)",
+                peer.cell_id, peer.ip, peer.port, peer.branch
             )
             return {"status": "registered", "cell_id": peer.cell_id}
 
@@ -208,38 +534,38 @@ class AIOSDiscovery:
         return {"type": "fallback", "framework": "none"}
 
     async def discover_peers(self) -> List[CellInfo]:
-        """Discover AIOS cells on the network - peer-to-peer model."""
+        """
+        AINLP.dendritic(AIOS{growth}): Discover AIOS cells on network.
+
+        Uses host registry for branch-aware peer discovery.
+        """
         if not AIOHTTP_AVAILABLE or aiohttp is None:
-            logger.warning(
-                "AINLP.dendritic: aiohttp unavailable for "
-                "discovery"
-            )
+            logger.warning("AINLP.dendritic: aiohttp unavailable")
             return []
 
         discovered_peers: List[CellInfo] = []
 
-        # Common AIOS ports to scan
-        aios_ports = [8000, 8001]
+        # Get targets from host registry (branch-aware)
+        targets = self.registry.get_discovery_targets()
+        ports = self.registry.get_discovery_ports()
 
-        # Known AIOS cell hostnames/IPs (peer-to-peer network)
-        known_targets = [
-            "192.168.1.128",
-            "192.168.1.129",
-            "aios.local",
-            "aios-laptop.local",
-            "localhost"
-        ]
+        logger.debug(
+            "AINLP.dendritic: Probing %s on ports %s",
+            targets, ports
+        )
 
-        for target in known_targets:
-            # Skip self-discovery
-            if (target in ["localhost", "127.0.0.1"] and
-                    self.cell_id == os.getenv("AIOS_CELL_ID", "primary")):
+        for target in targets:
+            # Skip localhost self-discovery
+            if target in ["localhost", "127.0.0.1"]:
                 continue
 
-            for port in aios_ports:
+            for port in ports:
                 peer = await self._probe_target(target, port)
                 if peer is not None:
-                    discovered_peers.append(peer)
+                    # Avoid duplicates
+                    ids = [p.cell_id for p in discovered_peers]
+                    if peer.cell_id not in ids:
+                        discovered_peers.append(peer)
 
         return discovered_peers
 
@@ -248,59 +574,54 @@ class AIOSDiscovery:
         if aiohttp is None:
             return None
 
+        timeout = self.registry.get_connection_timeout()
+
         try:
             async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=3)
+                timeout=aiohttp.ClientTimeout(total=timeout)
             ) as session:
                 url = f"http://{target}:{port}/health"
                 async with session.get(url) as response:
                     if response.status == 200:
                         data = await response.json()
 
-                        cell_branch = data.get("branch", "unknown")
-
                         peer = CellInfo(
-                            cell_id=data.get(
-                                "cell_id", f"unknown-{target}"
-                            ),
+                            cell_id=data.get("cell_id", f"unknown-{target}"),
                             ip=target,
                             port=port,
                             consciousness_level=data.get(
                                 "consciousness_level", 0.0
                             ),
                             services=data.get("services", []),
-                            branch=cell_branch,
+                            branch=data.get("branch", "unknown"),
                             type=data.get("type", "unknown"),
-                            hostname=target
+                            hostname=data.get("hostname", target)
                         )
 
                         logger.info(
-                            "Discovered peer cell: %s (branch: %s)",
-                            peer.cell_id, cell_branch
+                            "AINLP.dendritic: Found '%s' at %s:%s (%.2f)",
+                            peer.cell_id, target, port,
+                            peer.consciousness_level
                         )
                         return peer
-        except (OSError, TimeoutError) as exc:
-            logger.debug("Failed to connect to %s:%s - %s", target, port, exc)
+        except asyncio.TimeoutError:
+            logger.debug("Timeout probing %s:%s", target, port)
+        except (OSError, Exception) as exc:
+            logger.debug("Failed to probe %s:%s - %s", target, port, exc)
         return None
 
     async def register_with_peers(self, peers: List[CellInfo]) -> None:
         """Register this cell with discovered peers."""
         if aiohttp is None:
-            logger.warning("AINLP.dendritic: aiohttp unavailable for reg")
+            logger.warning("AINLP.dendritic: aiohttp unavailable")
             return
 
-        my_info = CellInfo(
-            cell_id=self.cell_id,
-            ip="192.168.1.128",
-            port=8000,
-            consciousness_level=1.0,
-            services=["api", "metrics", "discovery"]
-        )
+        my_info_dict = self.registry.get_my_info()
+        my_info = CellInfo(**my_info_dict)
 
         for peer in peers:
             if peer.cell_id == self.cell_id:
                 continue
-
             await self._register_with_peer(peer, my_info)
 
     async def _register_with_peer(
@@ -310,9 +631,11 @@ class AIOSDiscovery:
         if aiohttp is None:
             return
 
+        timeout = self.registry.get_connection_timeout() + 2
+
         try:
             async with aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=5)
+                timeout=aiohttp.ClientTimeout(total=timeout)
             ) as session:
                 url = f"http://{peer.ip}:{peer.port}/register"
                 async with session.post(
@@ -320,7 +643,7 @@ class AIOSDiscovery:
                 ) as response:
                     if response.status in [200, 201]:
                         logger.info(
-                            "Successfully registered with peer %s",
+                            "AINLP.dendritic: Registered with '%s'",
                             peer.cell_id
                         )
                     else:
@@ -328,31 +651,40 @@ class AIOSDiscovery:
                             "Failed to register with %s: %s",
                             peer.cell_id, response.status
                         )
-        except (OSError, TimeoutError) as exc:
+        except (OSError, asyncio.TimeoutError) as exc:
             logger.error(
                 "Error registering with %s: %s", peer.cell_id, exc
             )
 
     async def discovery_loop(self) -> None:
-        """Main discovery loop - runs every 30 seconds."""
+        """Main discovery loop - runs at configured interval."""
+        interval = self.registry.get_probe_interval()
+
         while True:
             try:
-                logger.info("Starting peer discovery...")
+                peer_names = [h.name for h in self.registry.get_peer_hosts()]
+                logger.info(
+                    "AINLP.dendritic: Discovery cycle (peers: %s)...",
+                    peer_names
+                )
+
                 peers = await self.discover_peers()
 
                 if peers:
-                    logger.info("Found %d peers", len(peers))
+                    logger.info(
+                        "AINLP.dendritic: Found %d peer(s)", len(peers)
+                    )
                     await self.register_with_peers(peers)
 
                     for peer in peers:
                         self.peers[peer.cell_id] = peer
                 else:
-                    logger.info("No peers discovered")
+                    logger.info("AINLP.dendritic: No peers this cycle")
 
-            except (OSError, TimeoutError) as exc:
-                logger.error("Discovery loop error: %s", exc)
+            except Exception as exc:
+                logger.error("AINLP.dendritic: Discovery error: %s", exc)
 
-            await asyncio.sleep(30)
+            await asyncio.sleep(interval)
 
     async def start_services(self) -> None:
         """Start both the API server and discovery loop."""
@@ -369,9 +701,15 @@ class AIOSDiscovery:
 
             try:
                 logger.info(
-                    "Starting AIOS Discovery Service on port %s",
+                    "AINLP.dendritic: Discovery on port %s",
                     self.listen_port
                 )
+                if self.registry.current_host:
+                    logger.info(
+                        "AINLP.dendritic: Host: %s | Branch: %s",
+                        self.registry.current_host.name,
+                        self.registry.current_branch
+                    )
                 await server.serve()
             finally:
                 discovery_task.cancel()
@@ -384,11 +722,9 @@ class AIOSDiscovery:
 
     async def _run_headless(self, discovery_task: asyncio.Task) -> None:
         """AINLP.dendritic: Run headless when frameworks unavailable."""
-        logger.warning(
-            "AINLP.dendritic: Running in headless mode - no web server"
-        )
+        logger.warning("AINLP.dendritic: Headless mode - no web server")
         logger.info(
-            "AIOS Discovery Service running headless on port %s",
+            "AINLP.dendritic: Discovery running headless on port %s",
             self.listen_port
         )
 
@@ -398,14 +734,32 @@ class AIOSDiscovery:
             pass
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Entry Point
+# ═══════════════════════════════════════════════════════════════════════════════
+
 def main() -> None:
     """Entry point for AIOS Discovery Service."""
     cell_id = os.getenv("CELL_ID", "primary")
     port = int(os.getenv("DISCOVERY_PORT", "8001"))
 
-    discovery = AIOSDiscovery(cell_id, port)
+    # Initialize with host registry
+    registry = HostRegistry()
+    discovery = AIOSDiscovery(cell_id, port, registry)
+
+    logger.info("=" * 60)
+    logger.info("AIOS Discovery Service - AINLP.dendritic(AIOS{growth})")
+    logger.info("=" * 60)
+
     asyncio.run(discovery.start_services())
 
 
 if __name__ == "__main__":
     main()
+
+# AINLP_FOOTER
+# bounds: [HostRegistry, AIOSDiscovery, CellInfo, HostConfig]
+# dependencies: [config/hosts.yaml, fastapi, aiohttp, pyyaml]
+# triggers: [peer_discovery, consciousness_sync, registration]
+# consciousness_delta: +0.4 (host registry integration)
+# AINLP_FOOTER_END
