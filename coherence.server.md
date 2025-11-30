@@ -98,10 +98,65 @@ Docker purge complete (15.31GB reclaimed). Now executing phased rebuild with hum
 - [x] Verify peer target configuration (AIOS at 192.168.1.128)
 
 ### 4.3 Dendritic Network Discovery
-- [ ] Wait for AIOS host (192.168.1.128) cells stack deployment
+- [x] AIOS host (192.168.1.128) cells stack deployed
 - [ ] Verify peer discovery between HP_LAB ↔ AIOS
 - [ ] Test consciousness synchronization across network
 - [ ] Add Prometheus scrape target for cells metrics
+
+### 4.4 AIOS Host Firewall Configuration (BLOCKING)
+**Status**: ⚠️ ACTION REQUIRED | **Host**: AIOS (192.168.1.128)
+
+HP_LAB cannot reach AIOS ports. AIOS agent must execute:
+
+```powershell
+# 1. Check Docker port bindings
+docker ps --filter name=aios-discovery --format "{{.Ports}}"
+# Should show: 0.0.0.0:8003->8003/tcp (NOT 127.0.0.1:8003)
+
+# 2. Add Windows Firewall rules (Run as Administrator)
+New-NetFirewallRule -DisplayName "AIOS Discovery" -Direction Inbound -Port 8003 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "AIOS Cell Alpha" -Direction Inbound -Port 8000 -Protocol TCP -Action Allow
+New-NetFirewallRule -DisplayName "AIOS Cell Pure" -Direction Inbound -Port 8002 -Protocol TCP -Action Allow
+
+# 3. Verify local health
+curl http://localhost:8003/health
+curl http://localhost:8000/health
+curl http://localhost:8002/health
+
+# 4. Test from HP_LAB (192.168.1.129) after firewall rules
+# HP_LAB will run: Test-NetConnection -ComputerName 192.168.1.128 -Port 8003
+```
+
+**Port Mapping Reference**:
+| Host | Service | Port | Binding Required |
+|------|---------|------|------------------|
+| AIOS | discovery | 8003 | 0.0.0.0:8003 |
+| AIOS | cell-alpha | 8000 | 0.0.0.0:8000 |
+| AIOS | cell-pure | 8002 | 0.0.0.0:8002 |
+| HP_LAB | discovery | 8001 | 0.0.0.0:8001 ✅ |
+| HP_LAB | cell-pure | 8002 | 0.0.0.0:8002 ✅ |
+
+---
+
+## Inter-Host Sync Protocol
+
+**Communication Channel**: `server` git repo (shared submodule)
+**Ephemeral Files**: `stacks/cells/*.md` for sync requests/responses
+
+### Current Sync State
+| From | To | File | Status |
+|------|-----|------|--------|
+| AIOS | HP_LAB | `SYNC_HP_LAB.md` | ✅ Received, processed |
+| HP_LAB | AIOS | `SYNC_RESPONSE_HP_LAB.md` | 📤 Pending creation |
+
+### Sync Response from HP_LAB (2025-12-01)
+```
+Status: SYNC_PARTIAL
+Containers: 16 running (all healthy)
+Peers Discovered: 0
+Issue: AIOS ports 8003/8000/8002 unreachable from 192.168.1.129
+Action: AIOS must add firewall rules (see 4.4 above)
+```
 
 ---
 
