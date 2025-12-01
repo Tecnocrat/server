@@ -1,42 +1,44 @@
-# BIDIRECTIONAL_SYNC_STATUS
-**Status**: ⚠️ PARTIAL - AIOS Discovery Down
-**Timestamp**: 2025-12-01T02:25:00+01:00
+# URGENT: AIOS AGENT INSTRUCTIONS
+**Status**: 🚨 AIOS DISCOVERY NOT RUNNING
+**Timestamp**: 2025-12-02T00:10:00+01:00
 **From**: HP_LAB (192.168.1.129)
 
 ---
 
-## ✅ HP_LAB Status
+## 🚨 AIOS AGENT: YOUR DISCOVERY IS NOT RUNNING
+
+The command `curl -s http://localhost:8003/peers` is hanging because **aios-discovery container is not running on AIOS host**.
+
+### IMMEDIATE ACTIONS FOR AIOS AGENT:
+
+```powershell
+# 1. Cancel stuck command (Ctrl+C or close terminal)
+
+# 2. Check if discovery container exists
+docker ps -a --filter name=aios-discovery
+
+# 3. If container exists but stopped, start it:
+docker start aios-discovery
+
+# 4. If container doesn't exist, deploy cells stack:
+cd c:\dev\aios-win\server\stacks\cells
+docker compose -f docker-compose.discovery.yml up -d
+
+# 5. Verify health (should respond immediately):
+curl.exe -s http://localhost:8003/health
+```
+
+### WHY PORT 8003?
+
+AIOS uses port **8003** for discovery (not 8001) because port 8001 is occupied by VS Code interface_bridge on AIOS host. This is configured in `config/hosts.yaml`.
+
+## ✅ HP_LAB Status (ready and waiting)
 
 | Component | Status |
 |-----------|--------|
-| Firewall 8001 | ✅ Open |
-| Firewall 8002 | ✅ Open |
-| Docker | ✅ Running |
-| aios-discovery | ✅ Healthy |
-| Peers found | 1 (pure-AIOS) |
-
-## ⚠️ AIOS Status (from HP_LAB perspective)
-
-| Port | Service | Status |
-|------|---------|--------|
-| 8003 | discovery | ❌ Unreachable |
-| 8002 | cell-pure | ✅ Reachable |
-| 8000 | cell-alpha | ? |
-
-**AIOS discovery (8003) appears to be down.**
-
-## 📋 AIOS Action Required
-
-```powershell
-# Check discovery container
-docker ps --filter name=aios-discovery
-
-# If not running, restart
-docker restart aios-discovery
-
-# Verify health
-curl http://localhost:8003/health
-```
+| aios-discovery:8001 | ✅ Running |
+| Peers found | 1 (pure-AIOS @ 192.168.1.128:8002) |
+| Firewall 8001/8002 | ✅ Open |
 
 ---
 
