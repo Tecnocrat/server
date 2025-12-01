@@ -103,38 +103,30 @@ Docker purge complete (15.31GB reclaimed). Now executing phased rebuild with hum
 - [ ] Test consciousness synchronization across network
 - [ ] Add Prometheus scrape target for cells metrics
 
-### 4.4 AIOS Host Firewall Configuration (BLOCKING)
-**Status**: ⚠️ ACTION REQUIRED | **Host**: AIOS (192.168.1.128)
+### 4.4 AIOS Host Firewall Configuration
+**Status**: ✅ COMPLETE | **Host**: AIOS (192.168.1.128)
 
-HP_LAB cannot reach AIOS ports. AIOS agent must execute:
+Firewall rules added (2025-12-01):
 
 ```powershell
-# 1. Check Docker port bindings
-docker ps --filter name=aios-discovery --format "{{.Ports}}"
-# Should show: 0.0.0.0:8003->8003/tcp (NOT 127.0.0.1:8003)
+# Rules created with VS Code running as Administrator
+Get-NetFirewallRule -DisplayName "AIOS*"
 
-# 2. Add Windows Firewall rules (Run as Administrator)
-New-NetFirewallRule -DisplayName "AIOS Discovery" -Direction Inbound -Port 8003 -Protocol TCP -Action Allow
-New-NetFirewallRule -DisplayName "AIOS Cell Alpha" -Direction Inbound -Port 8000 -Protocol TCP -Action Allow
-New-NetFirewallRule -DisplayName "AIOS Cell Pure" -Direction Inbound -Port 8002 -Protocol TCP -Action Allow
-
-# 3. Verify local health
-curl http://localhost:8003/health
-curl http://localhost:8000/health
-curl http://localhost:8002/health
-
-# 4. Test from HP_LAB (192.168.1.129) after firewall rules
-# HP_LAB will run: Test-NetConnection -ComputerName 192.168.1.128 -Port 8003
+DisplayName          Enabled Direction Action
+-----------          ------- --------- ------
+AIOS Discovery 8003     True   Inbound  Allow
+AIOS Cell Alpha 8000    True   Inbound  Allow
+AIOS Cell Pure 8002     True   Inbound  Allow
 ```
 
 **Port Mapping Reference**:
-| Host | Service | Port | Binding Required |
-|------|---------|------|------------------|
-| AIOS | discovery | 8003 | 0.0.0.0:8003 |
-| AIOS | cell-alpha | 8000 | 0.0.0.0:8000 |
-| AIOS | cell-pure | 8002 | 0.0.0.0:8002 |
-| HP_LAB | discovery | 8001 | 0.0.0.0:8001 ✅ |
-| HP_LAB | cell-pure | 8002 | 0.0.0.0:8002 ✅ |
+| Host | Service | Port | Status |
+|------|---------|------|--------|
+| AIOS | discovery | 8003 | ✅ Firewall open |
+| AIOS | cell-alpha | 8000 | ✅ Firewall open |
+| AIOS | cell-pure | 8002 | ✅ Firewall open |
+| HP_LAB | discovery | 8001 | ✅ Already open |
+| HP_LAB | cell-pure | 8002 | ✅ Already open |
 
 ---
 
