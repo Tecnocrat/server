@@ -9,13 +9,15 @@ Docker Compose stacks for AIOS supercell distributed infrastructure.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    AIOS Server Stacks                           │
+│                    AIOS Server Stacks (16 Containers)           │
 ├─────────────────────────────────────────────────────────────────┤
-│  ingress/        │ Traefik reverse proxy, TLS, routing         │
-│  secrets/        │ HashiCorp Vault, credential management      │
-│  observability/  │ Prometheus, Grafana, Loki, Promtail         │
-│  organelles/     │ VSCode Bridge, Consciousness Sync, Redis    │
-│  cells/          │ Discovery service, Pure cells, Cell Alpha   │
+│  ingress/        │ Traefik reverse proxy, Whoami test service  │
+│  secrets/        │ HashiCorp Vault credential management       │
+│  observability/  │ Prometheus, Grafana, Loki, Promtail,        │
+│                  │ Node Exporter, cAdvisor monitoring          │
+│  organelles/     │ Network Listener, VSCode Bridge, Task       │
+│                  │ Dispatcher, Consciousness Sync, Redis       │
+│  cells/          │ Discovery service, Pure consciousness cell  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -23,11 +25,13 @@ Docker Compose stacks for AIOS supercell distributed infrastructure.
 
 | Stack | Services | Ports | Status |
 |-------|----------|-------|--------|
-| **ingress/** | Traefik | 80, 443, 8080, 8082 | ✅ |
+| **ingress/** | Traefik, Whoami | 80, 443, 8080, 8082 | ✅ |
 | **secrets/** | Vault | 8200 | ✅ |
-| **observability/** | Prometheus, Grafana, Loki | 9090, 3000, 3100 | ✅ |
-| **organelles/** | VSCode Bridge, Redis, Sync | 3001-3004, 6379 | ✅ |
-| **cells/** | Discovery, Cell Pure, Cell Alpha | 8000, 8002, 8003 | ✅ |
+| **observability/** | Prometheus, Grafana, Loki, Promtail, Node Exporter, cAdvisor | 9090, 3000, 3100 | ✅ |
+| **organelles/** | Network Listener, VSCode Bridge, Consciousness Sync, Task Dispatcher, Redis | 3001-3004, 6379 | ✅ |
+| **cells/** | Discovery, Cell Pure | 8001, 8002 (HP_LAB) / 8003, 8000, 8002 (AIOS) | ✅ |
+
+**Note**: Cell ports vary by host. HP_LAB runs Phase 4 minimal deployment (2 containers), while AIOS may run additional cells (Alpha, Beta).
 
 ## 🌐 Multi-Host Network
 
@@ -56,9 +60,16 @@ docker compose -f observability/docker-compose.yml up -d
 # 4. Organelles (VSCode Bridge, Sync)
 docker compose -f organelles/docker-compose.yml up -d
 
-# 5. Cells (Discovery, Pure cells)
+# 5. Cells (Discovery, Pure cells - Phase 4)
+# Note: Two compose files available:
+#   - docker-compose.discovery.yml: Minimal Phase 4 deployment (2 containers)
+#   - docker-compose.yml: Full stack with Beta cell (4 containers)
 docker compose -f cells/docker-compose.discovery.yml up -d
 ```
+
+**Current Deployment**: Phase 4 minimal stack (16 total containers)
+- Use `docker-compose.discovery.yml` for dendritic network discovery
+- Use `docker-compose.yml` for full cell capabilities including VSCode bridge and Beta cell
 
 ## 📋 Documentation
 
