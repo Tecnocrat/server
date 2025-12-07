@@ -29,7 +29,9 @@ Docker Compose stacks for AIOS supercell distributed infrastructure.
 | **secrets/** | Vault | 8200 | ✅ |
 | **observability/** | Prometheus, Grafana, Loki, Promtail, Node Exporter, cAdvisor | 9090, 3000, 3100 | ✅ |
 | **organelles/** | Network Listener, VSCode Bridge, Consciousness Sync, Task Dispatcher, Redis | 3001-3004, 6379 | ✅ |
-| **cells/** | Discovery, Cell Pure | 8001, 8002 | ✅ |
+| **cells/** | Discovery, Cell Pure | 8001, 8002 (HP_LAB) / 8003, 8000, 8002 (AIOS) | ✅ |
+
+**Note**: Cell ports vary by host. HP_LAB runs Phase 4 minimal deployment (2 containers), while AIOS may run additional cells (Alpha, Beta).
 
 ## 🌐 Multi-Host Network
 
