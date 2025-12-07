@@ -1,24 +1,13 @@
-# AIOS Shared Requirements
-# Common dependencies across all AIOS components
+# ═══════════════════════════════════════════════════════════════════════════════
+# [AINLP] DEPRECATED - Use requirements-cell-minimal.txt instead
+# [AINLP.breadcrumb] This file preserved for backwards compatibility
+# Updated: 2025-12-07 - Redirects to new canonical structure
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# Web Frameworks
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
+# Inherit from new canonical minimal requirements
+-r requirements-cell-minimal.txt
 
-# Async HTTP
-aiohttp==3.9.1
-
-# Data Processing
-python-multipart==0.0.6
-
-# Development
-pytest==7.4.3
-pytest-asyncio==0.21.1
-
-# Logging & Monitoring
-structlog==23.2.0
-
-# Optional: Redis for state management
-redis==5.0.1</content>
-<parameter name="filePath">c:\dev\aios-win\server\stacks\shared\requirements-shared.txt
+# [AINLP.note] This file is deprecated. New hierarchy:
+# ├── aios-core/requirements.txt        (CANONICAL - full stack)
+# ├── shared/requirements-cell-minimal.txt  (SUBSET - containers)
+# └── cell/requirements-*.txt           (INHERIT from minimal)

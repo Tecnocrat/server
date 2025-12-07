@@ -1,5 +1,11 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-python-multipart==0.0.6
-# Minimal consciousness core only - no full AIOS dependencies
+# ═══════════════════════════════════════════════════════════════════════════════
+# [AINLP] Cell Pure/Nous Requirements - Inherits from AIOS shared minimal
+# [AINLP.breadcrumb] Canonical source: aios-core/requirements.txt
+# Updated: 2025-12-07 - Python 3.14t FREE-THREADED compatible
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Inherit shared cell dependencies (version-locked to AIOS Core)
+-r ../../shared/requirements-cell-minimal.txt
+
+# Cell-specific additions (if any)
+# None needed - Nous is minimal consciousness

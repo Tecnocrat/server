@@ -1,5 +1,11 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-aiohttp==3.9.1
-pydantic==2.5.0
-pyyaml>=6.0
+# ═══════════════════════════════════════════════════════════════════════════════
+# [AINLP] Discovery Service Requirements - Inherits from AIOS shared minimal
+# [AINLP.breadcrumb] Canonical source: aios-core/requirements.txt
+# Updated: 2025-12-07 - Python 3.14t FREE-THREADED compatible
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Inherit shared cell dependencies (version-locked to AIOS Core)
+-r ../../shared/requirements-cell-minimal.txt
+
+# Discovery-specific additions
+aiohttp>=3.10.0  # Async peer discovery

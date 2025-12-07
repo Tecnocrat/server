@@ -1,0 +1,45 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# [AINLP] AIOS Cell Minimal Requirements - Docker Container Subset
+# [AINLP.breadcrumb] This is a SUBSET of aios-core/requirements.txt for lightweight cells
+# Updated: 2025-12-07 - Python 3.14t FREE-THREADED compatible
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# PURPOSE: Minimal dependencies for containerized AIOS cells (Alpha, Nous, Discovery)
+# These cells don't need full ML stack - just web framework and communication
+#
+# CANONICAL SOURCE: aios-core/requirements.txt (FULL stack)
+# SUPERCELL VENV: c:\aios-supercell\.venv (runs everything locally)
+#
+# [AINLP.hierarchy]
+# ├── aios-core/requirements.txt      (CANONICAL - full ML/AI stack)
+# ├── aios-win/requirements.txt       (PLATFORM - Windows add-ins)
+# └── requirements-cell-minimal.txt   (SUBSET - containers only)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# [CYTOPLASM] Web Framework (version-locked to AIOS Core)
+fastapi>=0.115.0
+uvicorn>=0.32.0
+pydantic>=2.10.0
+
+# [DENDRITIC] Inter-cell Communication
+httpx>=0.27.0
+aiofiles>=24.1.0
+websockets>=13.0.0
+requests>=2.32.0
+
+# [MEMBRANE] Configuration & Monitoring
+pyyaml>=6.0.0
+python-dotenv>=1.0.0
+psutil>=6.1.0
+rich>=13.9.0
+
+# [ENVIRONMENT] Async Support
+anyio>=4.0.0
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# [AINLP.note] ML/AI packages (torch, transformers, numpy, scipy) are NOT included
+# Cells needing ML should use the full AIOS supercell venv or extend with:
+#   -r requirements-cell-minimal.txt
+#   torch>=2.5.0
+#   numpy>=2.1.0
+# ═══════════════════════════════════════════════════════════════════════════════
