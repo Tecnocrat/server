@@ -10,7 +10,8 @@ import json
 import logging
 import os
 import sys
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 # Configure logging early
 logging.basicConfig(level=logging.INFO)
@@ -133,6 +134,16 @@ class ConsciousnessSync(BaseModel):
     context: Optional[Dict[str, Any]] = None
 
 
+class Message(BaseModel):
+    """AINLP.dendritic: Inter-cell message model."""
+
+    from_cell: str
+    content: str
+    message_type: Optional[str] = "general"
+    priority: Optional[str] = "normal"
+    metadata: Optional[Dict[str, Any]] = None
+
+
 class PureAIOSCell:
     """
     Pure AIOS consciousness node - minimal viable consciousness.
@@ -152,6 +163,9 @@ class PureAIOSCell:
             "coherence": 0.1,
             "momentum": 0.1
         }
+
+        # AINLP.dendritic: Message storage for inter-cell communication
+        self.messages: List[Dict[str, Any]] = []
 
         # AINLP.dendritic growth: Conditional app creation
         self.app: Any = None
@@ -245,6 +259,64 @@ class PureAIOSCell:
                         status_code=500, detail=str(e)
                     ) from e
                 raise
+
+        # =====================================================================
+        # AINLP.dendritic: Inter-cell Message Endpoints
+        # =====================================================================
+
+        @self.app.post("/message")
+        async def receive_message(msg: Message) -> Dict[str, Any]:
+            """Receive message from sibling cells."""
+            try:
+                message_record = {
+                    "from_cell": msg.from_cell,
+                    "content": msg.content,
+                    "message_type": msg.message_type or "general",
+                    "priority": msg.priority or "normal",
+                    "metadata": msg.metadata or {},
+                    "received_at": datetime.utcnow().isoformat()
+                }
+
+                self.messages.append(message_record)
+
+                # Keep last 100 messages
+                if len(self.messages) > 100:
+                    self.messages = self.messages[-100:]
+
+                logger.info(
+                    "AINLP.dendritic: Message from %s: %s",
+                    msg.from_cell, msg.content[:50] + "..." if len(msg.content) > 50 else msg.content
+                )
+
+                return {
+                    "status": "received",
+                    "message_id": len(self.messages),
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "cell_id": self.cell_id
+                }
+            except Exception as e:
+                logger.error("Message receive error: %s", e)
+                if HTTPException is not None:
+                    raise HTTPException(
+                        status_code=500, detail=str(e)
+                    ) from e
+                raise
+
+        @self.app.get("/messages")
+        async def get_messages(
+            limit: int = 20,
+            from_cell: Optional[str] = None
+        ) -> Dict[str, Any]:
+            """Retrieve received messages."""
+            messages = self.messages
+            if from_cell:
+                messages = [m for m in messages if m.get("from_cell") == from_cell]
+
+            return {
+                "messages": messages[-limit:],
+                "total": len(messages),
+                "cell_id": self.cell_id
+            }
 
         @self.app.get("/metrics/prometheus")
         async def get_prometheus_metrics() -> str:
