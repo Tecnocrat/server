@@ -120,8 +120,8 @@ class CellBirther:
         print(f"🧬 Birthing cell: {name} on port {port}")
 
         # Create cell config using canonical aios-schema types
-        # AINLP.loader[latent:_config] Future cell orchestration/serialization
-        _config = CellConfig(
+        # AINLP.schema[VALIDATE] Ensures parameters match CellConfig contract
+        cell_config = CellConfig(
             name=name,
             port=port,
             environment={
@@ -133,7 +133,8 @@ class CellBirther:
             networks=[network],
             skip_core_build=skip_core_build,
         )
-        # _config available for future use (cell orchestration, serialization)
+        # AINLP.loader[latent:cell_config] Reserved for orchestration
+        _ = cell_config  # Schema validation complete, future use
 
         # Check if network exists, create if not
         self._ensure_network(network)
@@ -181,7 +182,9 @@ class CellBirther:
         container_id = result.stdout.strip()[:12]
 
         # Create identity using canonical aios-schema types
-        identity = CellIdentity(name=name, host="localhost", port=port, version="0.1.0")
+        identity = CellIdentity(
+            name=name, host="localhost", port=port, version="0.1.0"
+        )
         identity_dict = identity.to_dict()
         # Add runtime metadata
         identity_dict["birth_time"] = datetime.now().isoformat()
@@ -204,7 +207,9 @@ class CellBirther:
     def _ensure_network(self, network: str):
         """Ensure Docker network exists."""
         result = subprocess.run(
-            ["docker", "network", "inspect", network], capture_output=True, check=False
+            ["docker", "network", "inspect", network],
+            capture_output=True,
+            check=False
         )
         if result.returncode != 0:
             print(f"🔗 Creating network: {network}")
@@ -285,6 +290,14 @@ class CellBirther:
 
 
 def main():
+    """
+    CLI entry point for AIOS Cell Birth Automation.
+
+    Actions:
+        birth: Spawn a new AIOS cell container
+        list:  Show all registered cells and their status
+        kill:  Terminate a cell by name
+    """
     parser = argparse.ArgumentParser(description="AIOS Cell Birth Automation")
     parser.add_argument("action", choices=["birth", "list", "kill"])
     parser.add_argument("--name", help="Cell name (auto if not provided)")
