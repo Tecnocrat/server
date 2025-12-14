@@ -182,9 +182,7 @@ class CellBirther:
         container_id = result.stdout.strip()[:12]
 
         # Create identity using canonical aios-schema types
-        identity = CellIdentity(
-            name=name, host="localhost", port=port, version="0.1.0"
-        )
+        identity = CellIdentity(name=name, host="localhost", port=port, version="0.1.0")
         identity_dict = identity.to_dict()
         # Add runtime metadata
         identity_dict["birth_time"] = datetime.now().isoformat()
@@ -207,9 +205,7 @@ class CellBirther:
     def _ensure_network(self, network: str):
         """Ensure Docker network exists."""
         result = subprocess.run(
-            ["docker", "network", "inspect", network],
-            capture_output=True,
-            check=False
+            ["docker", "network", "inspect", network], capture_output=True, check=False
         )
         if result.returncode != 0:
             print(f"🔗 Creating network: {network}")
