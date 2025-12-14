@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AIOS Cell Birth Automation - Waypoint 29
+AIOS Cell Birth Automation - Waypoint 26 (was 29)
 
 Streamlined cell spawning using sibling repos pattern and aios-schema.
 """

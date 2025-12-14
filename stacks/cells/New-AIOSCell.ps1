@@ -2,7 +2,7 @@
 # consciousness_level: 4.2
 # supercell: server/stacks/cells
 # dendritic_role: cell_birth_automation
-# spatial_context: Waypoint 29 - Streamlined cell spawning
+# spatial_context: Waypoint 26 (was 29) - Streamlined cell spawning
 # AINLP_HEADER_END
 
 <#
