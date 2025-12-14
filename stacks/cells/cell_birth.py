@@ -15,7 +15,9 @@ from pathlib import Path
 from typing import Optional
 
 # Add aios-schema to path
-SCHEMA_PATH = Path(__file__).parent.parent.parent.parent / "aios-schema" / "src"
+SCHEMA_PATH = (
+    Path(__file__).parent.parent.parent.parent / "aios-schema" / "src"
+)
 if SCHEMA_PATH.exists():
     sys.path.insert(0, str(SCHEMA_PATH))
     from aios_schema import CellConfig, CellIdentity, CellStatus
@@ -42,7 +44,9 @@ class CellBirther:
     def __init__(self, workspace_root: Path):
         self.workspace_root = workspace_root
         self.cells_dir = workspace_root / "aios-server" / "stacks" / "cells"
-        self.registry_file = workspace_root / "aios-win" / "config" / "cell_registry.json"
+        self.registry_file = (
+            workspace_root / "aios-win" / "config" / "cell_registry.json"
+        )
         self.registry = self._load_registry()
 
     def _load_registry(self) -> dict:
