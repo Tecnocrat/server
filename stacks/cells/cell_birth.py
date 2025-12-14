@@ -30,10 +30,10 @@ from typing import Optional
 from aios_schema import CellConfig, CellIdentity
 
 # Schema verification (runtime assertion)
-assert hasattr(CellConfig, 'name'), \
-    "aios-schema CellConfig missing expected members"
-assert hasattr(CellIdentity, 'to_dict'), \
-    "aios-schema CellIdentity missing expected methods"
+assert hasattr(CellConfig, "name"), "aios-schema CellConfig missing expected members"
+assert hasattr(
+    CellIdentity, "to_dict"
+), "aios-schema CellIdentity missing expected methods"
 
 
 class CellBirther:
@@ -46,8 +46,16 @@ class CellBirther:
 
     # Greek alphabet for cell naming
     CELL_NAMES = [
-        "alpha", "beta", "gamma", "delta", "epsilon",
-        "zeta", "eta", "theta", "iota", "kappa"
+        "alpha",
+        "beta",
+        "gamma",
+        "delta",
+        "epsilon",
+        "zeta",
+        "eta",
+        "theta",
+        "iota",
+        "kappa",
     ]
 
     def __init__(self, workspace_root: Path):
@@ -61,14 +69,14 @@ class CellBirther:
     def _load_registry(self) -> dict:
         """Load or create cell registry."""
         if self.registry_file.exists():
-            with open(self.registry_file, encoding='utf-8') as f:
+            with open(self.registry_file, encoding="utf-8") as f:
                 return json.load(f)
         return {"cells": {}, "next_port": 8001}
 
     def _save_registry(self):
         """Persist cell registry."""
         self.registry_file.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.registry_file, "w", encoding='utf-8') as f:
+        with open(self.registry_file, "w", encoding="utf-8") as f:
             json.dump(self.registry, f, indent=2, default=str)
 
     def _get_next_cell_name(self) -> str:
@@ -92,7 +100,7 @@ class CellBirther:
         name: Optional[str] = None,
         port: Optional[int] = None,
         skip_core_build: bool = True,
-        network: str = "aios-mesh"
+        network: str = "aios-mesh",
     ) -> dict:
         """
         Birth a new AIOS cell.
@@ -120,10 +128,10 @@ class CellBirther:
                 "AIOS_CELL_ID": name,
                 "AIOS_BRANCH": "main",
                 "SKIP_CORE_BUILD": "1" if skip_core_build else "0",
-                "PYTHONPATH": "/app"
+                "PYTHONPATH": "/app",
             },
             networks=[network],
-            skip_core_build=skip_core_build
+            skip_core_build=skip_core_build,
         )
         # _config available for future use (cell orchestration, serialization)
 
@@ -136,26 +144,35 @@ class CellBirther:
         # Run container
         container_name = f"aios-cell-{name}"
         env_args = [
-            "-e", f"AIOS_CELL_ID={name}",
-            "-e", "AIOS_BRANCH=main",
-            "-e", f"SKIP_CORE_BUILD={'1' if skip_core_build else '0'}",
-            "-e", "PYTHONPATH=/app"
+            "-e",
+            f"AIOS_CELL_ID={name}",
+            "-e",
+            "AIOS_BRANCH=main",
+            "-e",
+            f"SKIP_CORE_BUILD={'1' if skip_core_build else '0'}",
+            "-e",
+            "PYTHONPATH=/app",
         ]
 
         cmd = [
-            "docker", "run", "-d",
-            "--name", container_name,
-            "--network", network,
-            "-p", f"{port}:8000",
-            "-p", f"{port + 1000}:9091",  # Metrics port
+            "docker",
+            "run",
+            "-d",
+            "--name",
+            container_name,
+            "--network",
+            network,
+            "-p",
+            f"{port}:8000",
+            "-p",
+            f"{port + 1000}:9091",  # Metrics port
             *env_args,
-            "--restart", "unless-stopped",
-            "aios-cell:latest"
+            "--restart",
+            "unless-stopped",
+            "aios-cell:latest",
         ]
 
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, check=False
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
         if result.returncode != 0:
             print(f"❌ Failed to birth cell: {result.stderr}")
@@ -164,12 +181,7 @@ class CellBirther:
         container_id = result.stdout.strip()[:12]
 
         # Create identity using canonical aios-schema types
-        identity = CellIdentity(
-            name=name,
-            host="localhost",
-            port=port,
-            version="0.1.0"
-        )
+        identity = CellIdentity(name=name, host="localhost", port=port, version="0.1.0")
         identity_dict = identity.to_dict()
         # Add runtime metadata
         identity_dict["birth_time"] = datetime.now().isoformat()
@@ -179,7 +191,7 @@ class CellBirther:
         self.registry["cells"][name] = {
             **identity_dict,
             "container_id": container_id,
-            "status": "healthy"
+            "status": "healthy",
         }
         self._save_registry()
 
@@ -192,16 +204,11 @@ class CellBirther:
     def _ensure_network(self, network: str):
         """Ensure Docker network exists."""
         result = subprocess.run(
-            ["docker", "network", "inspect", network],
-            capture_output=True,
-            check=False
+            ["docker", "network", "inspect", network], capture_output=True, check=False
         )
         if result.returncode != 0:
             print(f"🔗 Creating network: {network}")
-            subprocess.run(
-                ["docker", "network", "create", network],
-                check=False
-            )
+            subprocess.run(["docker", "network", "create", network], check=False)
 
     def _build_image(self, _skip_core_build: bool):
         """Build cell image if needed."""
@@ -211,7 +218,7 @@ class CellBirther:
             ["docker", "images", "-q", "aios-cell:latest"],
             capture_output=True,
             text=True,
-            check=False
+            check=False,
         )
 
         if not result.stdout.strip():
@@ -224,10 +231,13 @@ class CellBirther:
 
             # Build from workspace root
             cmd = [
-                "docker", "build",
-                "-f", str(dockerfile),
-                "-t", "aios-cell:latest",
-                str(self.workspace_root / "aios-win")  # Build context
+                "docker",
+                "build",
+                "-f",
+                str(dockerfile),
+                "-t",
+                "aios-cell:latest",
+                str(self.workspace_root / "aios-win"),  # Build context
             ]
             subprocess.run(cmd, cwd=self.workspace_root, check=False)
 
@@ -239,15 +249,17 @@ class CellBirther:
             result = subprocess.run(
                 ["docker", "inspect", f"aios-cell-{name}"],
                 capture_output=True,
-                check=False
+                check=False,
             )
             status = "running" if result.returncode == 0 else "stopped"
-            cells.append({
-                "name": name,
-                "port": info.get("port"),
-                "status": status,
-                "container_id": info.get("container_id", "unknown")
-            })
+            cells.append(
+                {
+                    "name": name,
+                    "port": info.get("port"),
+                    "status": status,
+                    "container_id": info.get("container_id", "unknown"),
+                }
+            )
         return cells
 
     def kill(self, name: str) -> bool:
@@ -256,15 +268,11 @@ class CellBirther:
 
         # Stop
         subprocess.run(
-            ["docker", "stop", container_name],
-            capture_output=True,
-            check=False
+            ["docker", "stop", container_name], capture_output=True, check=False
         )
         # Remove
         result = subprocess.run(
-            ["docker", "rm", container_name],
-            capture_output=True,
-            check=False
+            ["docker", "rm", container_name], capture_output=True, check=False
         )
 
         if result.returncode == 0:
@@ -277,15 +285,11 @@ class CellBirther:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="AIOS Cell Birth Automation"
-    )
+    parser = argparse.ArgumentParser(description="AIOS Cell Birth Automation")
     parser.add_argument("action", choices=["birth", "list", "kill"])
     parser.add_argument("--name", help="Cell name (auto if not provided)")
     parser.add_argument("--port", type=int, help="Port to expose")
-    parser.add_argument(
-        "--with-core", action="store_true", help="Build C++ core"
-    )
+    parser.add_argument("--with-core", action="store_true", help="Build C++ core")
 
     args = parser.parse_args()
 
@@ -296,9 +300,7 @@ def main():
 
     if args.action == "birth":
         result = birther.birth(
-            name=args.name,
-            port=args.port,
-            skip_core_build=not args.with_core
+            name=args.name, port=args.port, skip_core_build=not args.with_core
         )
         print(json.dumps(result, indent=2, default=str))
 
@@ -309,8 +311,10 @@ def main():
             print(f"\n{hdr}")
             print("-" * 45)
             for cell in cells:
-                row = (f"{cell['name']:<10} {cell['port']:<8} "
-                       f"{cell['status']:<10} {cell['container_id']:<15}")
+                row = (
+                    f"{cell['name']:<10} {cell['port']:<8} "
+                    f"{cell['status']:<10} {cell['container_id']:<15}"
+                )
                 print(row)
         else:
             print("No cells registered")
