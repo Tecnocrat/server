@@ -263,11 +263,15 @@ class CellBirther:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="AIOS Cell Birth Automation")
+    parser = argparse.ArgumentParser(
+        description="AIOS Cell Birth Automation"
+    )
     parser.add_argument("action", choices=["birth", "list", "kill"])
-    parser.add_argument("--name", help="Cell name (auto-assigned if not provided)")
+    parser.add_argument("--name", help="Cell name (auto if not provided)")
     parser.add_argument("--port", type=int, help="Port to expose")
-    parser.add_argument("--with-core", action="store_true", help="Build C++ core")
+    parser.add_argument(
+        "--with-core", action="store_true", help="Build C++ core"
+    )
     
     args = parser.parse_args()
     
