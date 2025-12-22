@@ -1,0 +1,55 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# AIOS Mesh Services - Discovery + Cytoplasm
+# AINLP.cellular[MESH] - Inter-cell communication infrastructure
+# ═══════════════════════════════════════════════════════════════════════════════
+# 
+# Deploys on existing aios-dendritic-mesh network
+# Usage: docker compose -f docker-compose.mesh.yml up -d
+#
+# Services:
+#   - aios-discovery: Cell registry and peer discovery (port 8001)
+#   - aios-cytoplasm: WebSocket mesh server (port 9002) [future]
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Cell Discovery Service - Network peer registry
+  # ─────────────────────────────────────────────────────────────────────────────
+  aios-discovery:
+    build:
+      context: .
+      dockerfile: discovery/Dockerfile.discovery
+    image: aios-discovery:latest
+    container_name: aios-discovery
+    hostname: discovery
+    restart: unless-stopped
+    networks:
+      - aios-dendritic-mesh
+      - aios-ingress
+    ports:
+      - "8001:8001"
+    environment:
+      - DISCOVERY_PORT=8001
+      - CELL_ID=discovery
+      - AIOS_MESH_NETWORK=aios-dendritic-mesh
+    volumes:
+      # Mount hosts.yaml from workspace root
+      - ${AIOS_WIN_PATH:-c:/dev/aios-win}/config/hosts.yaml:/app/config/hosts.yaml:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.discovery.rule=Host(`discovery.lan`)"
+      - "traefik.http.routers.discovery.entrypoints=web"
+      - "traefik.http.services.discovery.loadbalancer.server.port=8001"
+
+networks:
+  aios-dendritic-mesh:
+    external: true
+  aios-ingress:
+    external: true

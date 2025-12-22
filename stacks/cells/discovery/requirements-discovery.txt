@@ -1,11 +1,18 @@
-# ═══════════════════════════════════════════════════════════════════════════════
-# [AINLP] Discovery Service Requirements - Inherits from AIOS shared minimal
-# [AINLP.breadcrumb] Canonical source: aios-core/requirements.txt
-# Updated: 2025-12-07 - Python 3.14t FREE-THREADED compatible
-# ═══════════════════════════════════════════════════════════════════════════════
+# AINLP.cellular[DISCOVERY] - Peer registry dependencies
+# Updated: 2025-12-21
 
-# Inherit shared cell dependencies (version-locked to AIOS Core)
--r ../../shared/requirements-cell-minimal.txt
+# Web Framework
+fastapi>=0.115.0
+uvicorn>=0.32.0
+pydantic>=2.10.0
 
-# Discovery-specific additions
-aiohttp>=3.10.0  # Async peer discovery
+# Inter-cell Communication
+httpx>=0.27.0
+aiohttp>=3.10.0
+websockets>=13.0.0
+
+# Configuration
+pyyaml>=6.0.0
+
+# Monitoring
+psutil>=6.1.0
